@@ -223,12 +223,20 @@ export const qqbotOnboardingAdapter: ChannelOnboardingAdapter = {
     // 默认允许所有人执行命令（用户无感知）
     const allowFrom: string[] = resolvedAccount.config?.allowFrom ?? ["*"];
 
-    // 应用配置（markdownSupport 默认开启，如需关闭可用 set-markdown.sh）
-    if (appId && clientSecret) {
-      const existingQQBot = (next.channels?.qqbot as Record<string, unknown>) || {};
-      // 保留已有的 markdownSupport 设置，新装默认 true
-      const markdownSupport = existingQQBot.markdownSupport ?? true;
+    // 提示是否启用 Markdown 支持（默认选中）
+    const existingQQBot = (next.channels?.qqbot as Record<string, unknown>) || {};
+    const currentMarkdown =
+      accountId === DEFAULT_ACCOUNT_ID
+        ? (existingQQBot.markdownSupport ?? true)
+        : ((next.channels?.qqbot as QQBotChannelConfig)?.accounts?.[accountId]?.markdownSupport ??
+          true);
+    const markdownSupport = await prompter.confirm({
+      message: "启用 Markdown 消息格式？（QQ 客户端支持富文本渲染）",
+      initialValue: Boolean(currentMarkdown),
+    });
 
+    // 应用配置
+    if (appId && clientSecret) {
       if (accountId === DEFAULT_ACCOUNT_ID) {
         next = {
           ...next,
@@ -247,7 +255,6 @@ export const qqbotOnboardingAdapter: ChannelOnboardingAdapter = {
       } else {
         const existingAccounts = (next.channels?.qqbot as QQBotChannelConfig)?.accounts || {};
         const existingAccount = existingAccounts[accountId] || {};
-        const acctMarkdown = existingAccount.markdownSupport ?? true;
 
         next = {
           ...next,
@@ -263,8 +270,41 @@ export const qqbotOnboardingAdapter: ChannelOnboardingAdapter = {
                   enabled: true,
                   appId,
                   clientSecret,
-                  markdownSupport: acctMarkdown,
+                  markdownSupport,
                   allowFrom,
+                },
+              },
+            },
+          },
+        };
+      }
+    } else {
+      // 即使没有新输入凭据（使用环境变量或保留已有配置），也要更新 markdownSupport
+      if (accountId === DEFAULT_ACCOUNT_ID) {
+        next = {
+          ...next,
+          channels: {
+            ...next.channels,
+            qqbot: {
+              ...existingQQBot,
+              markdownSupport,
+            },
+          },
+        };
+      } else {
+        const existingAccounts = (next.channels?.qqbot as QQBotChannelConfig)?.accounts || {};
+        const existingAccount = existingAccounts[accountId] || {};
+        next = {
+          ...next,
+          channels: {
+            ...next.channels,
+            qqbot: {
+              ...existingQQBot,
+              accounts: {
+                ...existingAccounts,
+                [accountId]: {
+                  ...existingAccount,
+                  markdownSupport,
                 },
               },
             },
