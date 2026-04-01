@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /**
  * QQ Bot 配置类型
  */
@@ -10,6 +11,18 @@ export interface QQBotConfig {
 /**
  * 解析后的 QQ Bot 账户
  */
+=======
+import type { SecretInput } from "openclaw/plugin-sdk/secret-input";
+
+/** QQ Bot base config. */
+export interface QQBotConfig {
+  appId: string;
+  clientSecret?: SecretInput;
+  clientSecretFile?: string;
+}
+
+/** Resolved QQ Bot account config used at runtime. */
+>>>>>>> upstream/main
 export interface ResolvedQQBotAccount {
   accountId: string;
   name?: string;
@@ -17,22 +30,33 @@ export interface ResolvedQQBotAccount {
   appId: string;
   clientSecret: string;
   secretSource: "config" | "file" | "env" | "none";
+<<<<<<< HEAD
   /** 系统提示词 */
   systemPrompt?: string;
   /** 图床服务器公网地址 */
   imageServerBaseUrl?: string;
   /** 是否支持 markdown 消息（默认 true） */
+=======
+  /** Additional system prompt text. */
+  systemPrompt?: string;
+  /** Whether markdown output is enabled. Defaults to true. */
+>>>>>>> upstream/main
   markdownSupport: boolean;
   config: QQBotAccountConfig;
 }
 
+<<<<<<< HEAD
 /**
  * QQ Bot 账户配置
  */
+=======
+/** QQ Bot account config from user settings. */
+>>>>>>> upstream/main
 export interface QQBotAccountConfig {
   enabled?: boolean;
   name?: string;
   appId?: string;
+<<<<<<< HEAD
   clientSecret?: string;
   clientSecretFile?: string;
   dmPolicy?: "open" | "pairing" | "allowlist";
@@ -79,17 +103,78 @@ export interface AudioFormatPolicy {
  */
 export interface MessageAttachment {
   content_type: string; // 如 "image/png"
+=======
+  clientSecret?: SecretInput;
+  clientSecretFile?: string;
+  allowFrom?: string[];
+  /** Optional system prompt prepended to user messages. */
+  systemPrompt?: string;
+  /** Whether markdown output is enabled. Defaults to true. */
+  markdownSupport?: boolean;
+  /**
+   * @deprecated Use audioFormatPolicy.uploadDirectFormats instead.
+   * Legacy list of formats that can upload directly without SILK conversion.
+   */
+  voiceDirectUploadFormats?: string[];
+  /**
+   * Audio format policy covering inbound STT and outbound upload behavior.
+   */
+  audioFormatPolicy?: AudioFormatPolicy;
+  /**
+   * Whether public URLs should be uploaded to QQ directly. Defaults to true.
+   */
+  urlDirectUpload?: boolean;
+  /**
+   * Upgrade guide URL returned by `/bot-upgrade`.
+   */
+  upgradeUrl?: string;
+  /**
+   * Upgrade command mode.
+   * - "doc": show an upgrade guide link
+   * - "hot-reload": run an in-place npm update flow
+   */
+  upgradeMode?: "doc" | "hot-reload";
+}
+
+/** Audio format policy controlling which formats can skip transcoding. */
+export interface AudioFormatPolicy {
+  /**
+   * Formats supported directly by the STT provider.
+   */
+  sttDirectFormats?: string[];
+  /**
+   * Formats QQ accepts directly for outbound uploads.
+   */
+  uploadDirectFormats?: string[];
+  /**
+   * Whether outbound audio transcoding is enabled. Defaults to true.
+   */
+  transcodeEnabled?: boolean;
+}
+
+/** Rich-media attachment metadata. */
+export interface MessageAttachment {
+  content_type: string;
+>>>>>>> upstream/main
   filename?: string;
   height?: number;
   width?: number;
   size?: number;
   url: string;
+<<<<<<< HEAD
   voice_wav_url?: string; // QQ 提供的 WAV 格式语音直链，有值时优先使用以避免 SILK→WAV 转换
 }
 
 /**
  * C2C 消息事件
  */
+=======
+  voice_wav_url?: string;
+  asr_refer_text?: string;
+}
+
+/** C2C message event payload. */
+>>>>>>> upstream/main
 export interface C2CMessageEvent {
   author: {
     id: string;
@@ -101,13 +186,22 @@ export interface C2CMessageEvent {
   timestamp: string;
   message_scene?: {
     source: string;
+<<<<<<< HEAD
+=======
+    /** ext can contain ref_msg_idx and msg_idx values. */
+    ext?: string[];
+>>>>>>> upstream/main
   };
   attachments?: MessageAttachment[];
 }
 
+<<<<<<< HEAD
 /**
  * 频道 AT 消息事件
  */
+=======
+/** Guild @-message event payload. */
+>>>>>>> upstream/main
 export interface GuildMessageEvent {
   id: string;
   channel_id: string;
@@ -126,9 +220,13 @@ export interface GuildMessageEvent {
   attachments?: MessageAttachment[];
 }
 
+<<<<<<< HEAD
 /**
  * 群聊 AT 消息事件
  */
+=======
+/** Group @-message event payload. */
+>>>>>>> upstream/main
 export interface GroupMessageEvent {
   author: {
     id: string;
@@ -139,12 +237,23 @@ export interface GroupMessageEvent {
   timestamp: string;
   group_id: string;
   group_openid: string;
+<<<<<<< HEAD
   attachments?: MessageAttachment[];
 }
 
 /**
  * WebSocket 事件负载
  */
+=======
+  message_scene?: {
+    source: string;
+    ext?: string[];
+  };
+  attachments?: MessageAttachment[];
+}
+
+/** WebSocket event payload. */
+>>>>>>> upstream/main
 export interface WSPayload {
   op: number;
   d?: unknown;

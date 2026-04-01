@@ -1,4 +1,5 @@
 /**
+<<<<<<< HEAD
  * QQ Bot 主动发送消息模块
  *
  * 该模块提供以下能力：
@@ -28,6 +29,35 @@ export interface KnownUser {
 /**
  * 主动发送消息选项
  */
+=======
+ * QQ Bot proactive messaging helpers.
+ *
+ * This module sends proactive messages and manages known-user queries.
+ * Known-user storage is delegated to `./known-users.ts`.
+ */
+
+import type { ResolvedQQBotAccount } from "./types.js";
+import { debugLog, debugError } from "./utils/debug-log.js";
+
+// Re-export known-user types and functions from the canonical module.
+export type { KnownUser } from "./known-users.js";
+export {
+  recordKnownUser,
+  listKnownUsers as listKnownUsersFromStore,
+  getKnownUser as getKnownUserFromStore,
+  removeKnownUser as removeKnownUserFromStore,
+  clearKnownUsers as clearKnownUsersFromStore,
+  flushKnownUsers,
+} from "./known-users.js";
+import {
+  listKnownUsers as listKnownUsersImpl,
+  removeKnownUser as removeKnownUserImpl,
+  clearKnownUsers as clearKnownUsersImpl,
+  getKnownUser as getKnownUserImpl,
+} from "./known-users.js";
+
+/** Options for proactive message sending. */
+>>>>>>> upstream/main
 export interface ProactiveSendOptions {
   to: string;
   text: string;
@@ -36,9 +66,13 @@ export interface ProactiveSendOptions {
   accountId?: string;
 }
 
+<<<<<<< HEAD
 /**
  * 主动发送消息结果
  */
+=======
+/** Result returned from proactive sends. */
+>>>>>>> upstream/main
 export interface ProactiveSendResult {
   success: boolean;
   messageId?: string;
@@ -46,16 +80,24 @@ export interface ProactiveSendResult {
   error?: string;
 }
 
+<<<<<<< HEAD
 /**
  * 列出已知用户选项
  */
+=======
+/** Filters for listing known users. */
+>>>>>>> upstream/main
 export interface ListKnownUsersOptions {
   type?: "c2c" | "group" | "channel";
   accountId?: string;
   sortByLastInteraction?: boolean;
   limit?: number;
 }
+<<<<<<< HEAD
 import type { OpenClawConfig } from "openclaw/plugin-sdk";
+=======
+import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
+>>>>>>> upstream/main
 import {
   getAccessToken,
   sendProactiveC2CMessage,
@@ -65,6 +107,7 @@ import {
   sendGroupImageMessage,
 } from "./api.js";
 import { resolveQQBotAccount } from "./config.js";
+<<<<<<< HEAD
 // ============ 用户存储管理 ============
 /**
  * 已知用户存储
@@ -178,10 +221,15 @@ export function recordKnownUser(user: Omit<KnownUser, "firstInteractionAt">): vo
  * @param openid - 用户 openid
  * @param accountId - 账户 ID
  */
+=======
+
+/** Look up a known user entry (adapter for the old proactive API shape). */
+>>>>>>> upstream/main
 export function getKnownUser(
   type: string,
   openid: string,
   accountId: string,
+<<<<<<< HEAD
 ): KnownUser | undefined {
   const users = loadKnownUsers();
   const key = getUserKey(type, openid, accountId);
@@ -299,13 +347,47 @@ export function clearKnownUsers(accountId?: string): number {
  * }, cfg);
  * ```
  */
+=======
+): ReturnType<typeof getKnownUserImpl> {
+  return getKnownUserImpl(accountId, openid, type as "c2c" | "group");
+}
+
+/** List known users with optional filtering and sorting (adapter). */
+export function listKnownUsers(
+  options?: ListKnownUsersOptions,
+): ReturnType<typeof listKnownUsersImpl> {
+  const type = options?.type;
+  return listKnownUsersImpl({
+    type: type === "channel" ? undefined : (type as "c2c" | "group" | undefined),
+    accountId: options?.accountId,
+    limit: options?.limit,
+    sortBy: options?.sortByLastInteraction !== false ? "lastSeenAt" : undefined,
+    sortOrder: "desc",
+  });
+}
+
+/** Remove one known user entry (adapter). */
+export function removeKnownUser(type: string, openid: string, accountId: string): boolean {
+  return removeKnownUserImpl(accountId, openid, type as "c2c" | "group");
+}
+
+/** Clear all known users, optionally scoped to a single account (adapter). */
+export function clearKnownUsers(accountId?: string): number {
+  return clearKnownUsersImpl(accountId);
+}
+
+/** Resolve account config and send a proactive message. */
+>>>>>>> upstream/main
 export async function sendProactive(
   options: ProactiveSendOptions,
   cfg: OpenClawConfig,
 ): Promise<ProactiveSendResult> {
   const { to, text, type = "c2c", imageUrl, accountId = "default" } = options;
 
+<<<<<<< HEAD
   // 解析账户配置
+=======
+>>>>>>> upstream/main
   const account = resolveQQBotAccount(cfg, accountId);
 
   if (!account.appId || !account.clientSecret) {
@@ -318,6 +400,7 @@ export async function sendProactive(
   try {
     const accessToken = await getAccessToken(account.appId, account.clientSecret);
 
+<<<<<<< HEAD
     // 如果有图片，先发送图片
     if (imageUrl) {
       try {
@@ -342,6 +425,35 @@ export async function sendProactive(
       result = await sendProactiveGroupMessage(accessToken, to, text);
     } else if (type === "channel") {
       // 频道消息需要 channel_id，这里暂时不支持主动发送
+=======
+    if (imageUrl) {
+      try {
+        if (type === "c2c") {
+          await sendC2CImageMessage(account.appId, accessToken, to, imageUrl, undefined, undefined);
+        } else if (type === "group") {
+          await sendGroupImageMessage(
+            account.appId,
+            accessToken,
+            to,
+            imageUrl,
+            undefined,
+            undefined,
+          );
+        }
+        debugLog(`[qqbot:proactive] Sent image to ${type}:${to}`);
+      } catch (err) {
+        debugError(`[qqbot:proactive] Failed to send image: ${err}`);
+      }
+    }
+
+    let result: { id: string; timestamp: number | string };
+
+    if (type === "c2c") {
+      result = await sendProactiveC2CMessage(account.appId, accessToken, to, text);
+    } else if (type === "group") {
+      result = await sendProactiveGroupMessage(account.appId, accessToken, to, text);
+    } else if (type === "channel") {
+>>>>>>> upstream/main
       return {
         success: false,
         error: "Channel proactive messages are not supported. Please use group or c2c.",
@@ -353,7 +465,11 @@ export async function sendProactive(
       };
     }
 
+<<<<<<< HEAD
     console.log(`[qqbot:proactive] Sent message to ${type}:${to}, id: ${result.id}`);
+=======
+    debugLog(`[qqbot:proactive] Sent message to ${type}:${to}, id: ${result.id}`);
+>>>>>>> upstream/main
 
     return {
       success: true,
@@ -362,7 +478,11 @@ export async function sendProactive(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+<<<<<<< HEAD
     console.error(`[qqbot:proactive] Failed to send message: ${message}`);
+=======
+    debugError(`[qqbot:proactive] Failed to send message: ${message}`);
+>>>>>>> upstream/main
 
     return {
       success: false,
@@ -371,6 +491,7 @@ export async function sendProactive(
   }
 }
 
+<<<<<<< HEAD
 /**
  * 批量发送主动消息
  *
@@ -381,6 +502,9 @@ export async function sendProactive(
  * @param accountId - 账户 ID
  * @returns 发送结果列表
  */
+=======
+/** Send one proactive message to each recipient. */
+>>>>>>> upstream/main
 export async function sendBulkProactiveMessage(
   recipients: string[],
   text: string,
@@ -394,7 +518,11 @@ export async function sendBulkProactiveMessage(
     const result = await sendProactive({ to, text, type, accountId }, cfg);
     results.push({ to, result });
 
+<<<<<<< HEAD
     // 添加延迟，避免频率限制
+=======
+    // Add a small delay to reduce rate-limit pressure.
+>>>>>>> upstream/main
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
@@ -402,12 +530,21 @@ export async function sendBulkProactiveMessage(
 }
 
 /**
+<<<<<<< HEAD
  * 发送消息给所有已知用户
  *
  * @param text - 消息内容
  * @param cfg - OpenClaw 配置
  * @param options - 过滤选项
  * @returns 发送结果统计
+=======
+ * Send a message to all known users.
+ *
+ * @param text Message content.
+ * @param cfg OpenClaw config.
+ * @param options Optional filters.
+ * @returns Aggregate send statistics.
+>>>>>>> upstream/main
  */
 export async function broadcastMessage(
   text: string,
@@ -430,7 +567,11 @@ export async function broadcastMessage(
     sortByLastInteraction: true,
   });
 
+<<<<<<< HEAD
   // 过滤掉频道用户（不支持主动发送）
+=======
+  // Channel recipients do not support proactive sends.
+>>>>>>> upstream/main
   const validUsers = users.filter((u) => u.type === "c2c" || u.type === "group");
 
   const results: Array<{ to: string; result: ProactiveSendResult }> = [];
@@ -438,9 +579,16 @@ export async function broadcastMessage(
   let failed = 0;
 
   for (const user of validUsers) {
+<<<<<<< HEAD
     const result = await sendProactive(
       {
         to: user.openid,
+=======
+    const targetId = user.type === "group" ? (user.groupOpenid ?? user.openid) : user.openid;
+    const result = await sendProactive(
+      {
+        to: targetId,
+>>>>>>> upstream/main
         text,
         type: user.type as "c2c" | "group",
         accountId: user.accountId,
@@ -448,7 +596,11 @@ export async function broadcastMessage(
       cfg,
     );
 
+<<<<<<< HEAD
     results.push({ to: user.openid, result });
+=======
+    results.push({ to: targetId, result });
+>>>>>>> upstream/main
 
     if (result.success) {
       success++;
@@ -456,7 +608,11 @@ export async function broadcastMessage(
       failed++;
     }
 
+<<<<<<< HEAD
     // 添加延迟，避免频率限制
+=======
+    // Add a small delay to reduce rate-limit pressure.
+>>>>>>> upstream/main
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
@@ -468,6 +624,7 @@ export async function broadcastMessage(
   };
 }
 
+<<<<<<< HEAD
 // ============ 辅助函数 ============
 
 /**
@@ -477,6 +634,17 @@ export async function broadcastMessage(
  * @param to - 目标 openid
  * @param text - 消息内容
  * @param type - 消息类型
+=======
+// Helpers.
+
+/**
+ * Send a proactive message using a resolved account without a full config object.
+ *
+ * @param account Resolved account configuration.
+ * @param to Target openid.
+ * @param text Message content.
+ * @param type Message type.
+>>>>>>> upstream/main
  */
 export async function sendProactiveMessageDirect(
   account: ResolvedQQBotAccount,
@@ -497,9 +665,15 @@ export async function sendProactiveMessageDirect(
     let result: { id: string; timestamp: number | string };
 
     if (type === "c2c") {
+<<<<<<< HEAD
       result = await sendProactiveC2CMessage(accessToken, to, text);
     } else {
       result = await sendProactiveGroupMessage(accessToken, to, text);
+=======
+      result = await sendProactiveC2CMessage(account.appId, accessToken, to, text);
+    } else {
+      result = await sendProactiveGroupMessage(account.appId, accessToken, to, text);
+>>>>>>> upstream/main
     }
 
     return {
@@ -516,7 +690,11 @@ export async function sendProactiveMessageDirect(
 }
 
 /**
+<<<<<<< HEAD
  * 获取已知用户统计
+=======
+ * Return known-user counts for the selected account.
+>>>>>>> upstream/main
  */
 export function getKnownUsersStats(accountId?: string): {
   total: number;
@@ -530,6 +708,10 @@ export function getKnownUsersStats(accountId?: string): {
     total: users.length,
     c2c: users.filter((u) => u.type === "c2c").length,
     group: users.filter((u) => u.type === "group").length,
+<<<<<<< HEAD
     channel: users.filter((u) => u.type === "channel").length,
+=======
+    channel: 0, // Channel users are not tracked in known-users storage.
+>>>>>>> upstream/main
   };
 }

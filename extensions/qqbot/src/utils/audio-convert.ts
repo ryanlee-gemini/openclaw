@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
+<<<<<<< HEAD
 import { decode, encode, isSilk } from "silk-wasm";
 import { detectFfmpeg, isWindows } from "./platform.js";
 
@@ -22,6 +23,14 @@ function isSilkFile(filePath: string): boolean {
  * 将 PCM (s16le) 数据封装为 WAV 文件格式
  * WAV = 44 字节 RIFF 头 + PCM 原始数据
  */
+=======
+import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
+import { decode, encode, isSilk } from "silk-wasm";
+import { debugLog, debugError, debugWarn } from "./debug-log.js";
+import { detectFfmpeg, isWindows } from "./platform.js";
+
+/** Wrap PCM s16le bytes in a WAV container. */
+>>>>>>> upstream/main
 function pcmToWav(
   pcmData: Uint8Array,
   sampleRate: number,
@@ -59,11 +68,15 @@ function pcmToWav(
   return buffer;
 }
 
+<<<<<<< HEAD
 /**
  * 去除 QQ 语音文件的 AMR 头（如果存在）
  * QQ 的 .amr 文件可能在 SILK 数据前有 "#!AMR\n" 头（6 字节）
  * 需要去除后才能被 silk-wasm 正确解码
  */
+=======
+/** Strip a leading AMR header from QQ voice payloads when present. */
+>>>>>>> upstream/main
 function stripAmrHeader(buf: Buffer): Buffer {
   const AMR_HEADER = Buffer.from("#!AMR\n");
   if (buf.length > 6 && buf.subarray(0, 6).equals(AMR_HEADER)) {
@@ -72,6 +85,7 @@ function stripAmrHeader(buf: Buffer): Buffer {
   return buf;
 }
 
+<<<<<<< HEAD
 /**
  * 将 SILK/AMR 语音文件转换为 WAV 格式
  *
@@ -79,6 +93,9 @@ function stripAmrHeader(buf: Buffer): Buffer {
  * @param outputDir 输出目录（默认与输入文件同目录）
  * @returns 转换后的 WAV 文件路径，失败返回 null
  */
+=======
+/** Convert SILK or AMR voice files into WAV. */
+>>>>>>> upstream/main
 export async function convertSilkToWav(
   inputPath: string,
   outputDir?: string,
@@ -89,21 +106,30 @@ export async function convertSilkToWav(
 
   const fileBuf = fs.readFileSync(inputPath);
 
+<<<<<<< HEAD
   // 去除可能的 AMR 头
   const strippedBuf = stripAmrHeader(fileBuf);
 
   // 转为 Uint8Array 以兼容 silk-wasm 类型要求
+=======
+  const strippedBuf = stripAmrHeader(fileBuf);
+
+>>>>>>> upstream/main
   const rawData = new Uint8Array(
     strippedBuf.buffer,
     strippedBuf.byteOffset,
     strippedBuf.byteLength,
   );
 
+<<<<<<< HEAD
   // 验证是否为 SILK 格式
+=======
+>>>>>>> upstream/main
   if (!isSilk(rawData)) {
     return null;
   }
 
+<<<<<<< HEAD
   // SILK 解码为 PCM (s16le)
   // QQ 语音通常采样率为 24000Hz
   const sampleRate = 24000;
@@ -113,6 +139,14 @@ export async function convertSilkToWav(
   const wavBuffer = pcmToWav(result.data, sampleRate);
 
   // 写入 WAV 文件
+=======
+  // QQ voice commonly uses 24 kHz.
+  const sampleRate = 24000;
+  const result = await decode(rawData, sampleRate);
+
+  const wavBuffer = pcmToWav(result.data, sampleRate);
+
+>>>>>>> upstream/main
   const dir = outputDir || path.dirname(inputPath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -124,9 +158,13 @@ export async function convertSilkToWav(
   return { wavPath, duration: result.duration };
 }
 
+<<<<<<< HEAD
 /**
  * 判断是否为语音附件（根据 content_type 或文件扩展名）
  */
+=======
+/** Return true when an attachment looks like a voice file. */
+>>>>>>> upstream/main
 export function isVoiceAttachment(att: { content_type?: string; filename?: string }): boolean {
   if (att.content_type === "voice" || att.content_type?.startsWith("audio/")) {
     return true;
@@ -135,6 +173,7 @@ export function isVoiceAttachment(att: { content_type?: string; filename?: strin
   return [".amr", ".silk", ".slk", ".slac"].includes(ext);
 }
 
+<<<<<<< HEAD
 /**
  * 格式化语音时长为可读字符串
  */
@@ -149,6 +188,24 @@ export function formatDuration(durationMs: number): string {
 }
 
 export function isAudioFile(filePath: string): boolean {
+=======
+/** Format a duration as a user-readable string. */
+export function formatDuration(durationMs: number): string {
+  const seconds = Math.round(durationMs / 1000);
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainSeconds = seconds % 60;
+  return remainSeconds > 0 ? `${minutes}m ${remainSeconds}s` : `${minutes}m`;
+}
+
+export function isAudioFile(filePath: string, mimeType?: string): boolean {
+  // Prefer MIME when extension data is missing or misleading.
+  if (mimeType) {
+    if (mimeType === "voice" || mimeType.startsWith("audio/")) return true;
+  }
+>>>>>>> upstream/main
   const ext = path.extname(filePath).toLowerCase();
   return [
     ".silk",
@@ -166,18 +223,56 @@ export function isAudioFile(filePath: string): boolean {
   ].includes(ext);
 }
 
+<<<<<<< HEAD
 // ============ TTS（文字转语音）============
+=======
+/** Voice MIME types the QQ platform accepts without transcoding. */
+const QQ_NATIVE_VOICE_MIMES = new Set([
+  "audio/silk",
+  "audio/amr",
+  "audio/wav",
+  "audio/wave",
+  "audio/x-wav",
+  "audio/mpeg",
+  "audio/mp3",
+]);
+
+/** Voice extensions the QQ platform accepts without transcoding. */
+const QQ_NATIVE_VOICE_EXTS = new Set([".silk", ".slk", ".amr", ".wav", ".mp3"]);
+
+/**
+ * Return true when voice input must be transcoded before upload.
+ */
+export function shouldTranscodeVoice(filePath: string, mimeType?: string): boolean {
+  // Prefer MIME when it is available.
+  if (mimeType && QQ_NATIVE_VOICE_MIMES.has(mimeType.toLowerCase())) {
+    return false;
+  }
+  const ext = path.extname(filePath).toLowerCase();
+  if (QQ_NATIVE_VOICE_EXTS.has(ext)) {
+    return false;
+  }
+  return isAudioFile(filePath, mimeType);
+}
+
+// TTS helpers.
+>>>>>>> upstream/main
 
 export interface TTSConfig {
   baseUrl: string;
   apiKey: string;
   model: string;
   voice: string;
+<<<<<<< HEAD
   /** Azure OpenAI 风格：使用 api-key header 而非 Bearer token */
   authStyle?: "bearer" | "api-key";
   /** 附加在 URL 后的查询参数，如 Azure 的 api-version */
   queryParams?: Record<string, string>;
   /** 自定义速度（默认不传） */
+=======
+  authStyle?: "bearer" | "api-key";
+  queryParams?: Record<string, string>;
+>>>>>>> upstream/main
   speed?: number;
 }
 
@@ -215,7 +310,11 @@ function resolveTTSFromBlock(
 export function resolveTTSConfig(cfg: Record<string, unknown>): TTSConfig | null {
   const c = cfg as any;
 
+<<<<<<< HEAD
   // 优先使用 channels.qqbot.tts（插件专属配置）
+=======
+  // Prefer plugin-specific TTS config first.
+>>>>>>> upstream/main
   const channelTts = c?.channels?.qqbot?.tts;
   if (channelTts && channelTts.enabled !== false) {
     const providerId: string = channelTts?.provider || "openai";
@@ -224,9 +323,15 @@ export function resolveTTSConfig(cfg: Record<string, unknown>): TTSConfig | null
     if (result) return result;
   }
 
+<<<<<<< HEAD
   // 回退到 messages.tts（openclaw 框架级 TTS 配置）
   const msgTts = c?.messages?.tts;
   if (msgTts && msgTts.auto !== "disabled") {
+=======
+  // Fall back to framework-level TTS config.
+  const msgTts = c?.messages?.tts;
+  if (msgTts && msgTts.auto !== "off" && msgTts.auto !== "disabled") {
+>>>>>>> upstream/main
     const providerId: string = msgTts?.provider || "openai";
     const providerBlock = msgTts?.[providerId];
     const providerCfg = c?.models?.providers?.[providerId];
@@ -238,18 +343,44 @@ export function resolveTTSConfig(cfg: Record<string, unknown>): TTSConfig | null
 }
 
 /**
+<<<<<<< HEAD
  * 构建 TTS 请求 URL 和 Headers
  * 支持 OpenAI 标准和 Azure OpenAI 两种风格
  */
 function buildTTSRequest(ttsCfg: TTSConfig): { url: string; headers: Record<string, string> } {
   // 构建 URL：baseUrl + /audio/speech + 可选 queryParams
+=======
+ * Check whether global TTS is potentially available by inspecting the
+ * framework-level `messages.tts` config.  This mirrors the resolution logic
+ * in the core `resolveTtsConfig`: when `auto` is set it must not be `"off"`;
+ * when only the legacy `enabled` boolean is present it must be truthy;
+ * when neither is set TTS defaults to off.
+ *
+ * This does NOT guarantee a specific provider is registered/configured – it
+ * only checks that TTS is not explicitly (or implicitly) disabled.
+ */
+export function isGlobalTTSAvailable(cfg: OpenClawConfig): boolean {
+  const msgTts = cfg.messages?.tts;
+  if (!msgTts) return false;
+  // Framework canonical field takes precedence.
+  if (msgTts.auto) return msgTts.auto !== "off";
+  // Legacy compat: `enabled: true` → "always", absent/false → "off".
+  return msgTts.enabled === true;
+}
+
+/** Build the TTS endpoint URL and auth headers. */
+function buildTTSRequest(ttsCfg: TTSConfig): { url: string; headers: Record<string, string> } {
+>>>>>>> upstream/main
   let url = `${ttsCfg.baseUrl}/audio/speech`;
   if (ttsCfg.queryParams && Object.keys(ttsCfg.queryParams).length > 0) {
     const qs = new URLSearchParams(ttsCfg.queryParams).toString();
     url += `?${qs}`;
   }
 
+<<<<<<< HEAD
   // 构建认证 Header
+=======
+>>>>>>> upstream/main
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (ttsCfg.authStyle === "api-key") {
     headers["api-key"] = ttsCfg.apiKey;
@@ -267,6 +398,7 @@ export async function textToSpeechPCM(
   const sampleRate = 24000;
   const { url, headers } = buildTTSRequest(ttsCfg);
 
+<<<<<<< HEAD
   console.log(
     `[tts] Request: model=${ttsCfg.model}, voice=${ttsCfg.voice}, authStyle=${ttsCfg.authStyle ?? "bearer"}, url=${url}`,
   );
@@ -275,6 +407,16 @@ export async function textToSpeechPCM(
   );
 
   // 先尝试 PCM 格式（最高质量，无需二次转码）
+=======
+  debugLog(
+    `[tts] Request: model=${ttsCfg.model}, voice=${ttsCfg.voice}, authStyle=${ttsCfg.authStyle ?? "bearer"}, url=${url}`,
+  );
+  debugLog(
+    `[tts] Input text (${text.length} chars): "${text.slice(0, 80)}${text.length > 80 ? "..." : ""}"`,
+  );
+
+  // Prefer PCM first to avoid an extra decode pass.
+>>>>>>> upstream/main
   const formats: Array<{ format: string; needsDecode: boolean }> = [
     { format: "pcm", needsDecode: false },
     { format: "mp3", needsDecode: true },
@@ -297,7 +439,11 @@ export async function textToSpeechPCM(
         ...(ttsCfg.speed !== undefined ? { speed: ttsCfg.speed } : {}),
       };
 
+<<<<<<< HEAD
       console.log(`[tts] Trying format=${format}...`);
+=======
+      debugLog(`[tts] Trying format=${format}...`);
+>>>>>>> upstream/main
       const fetchStart = Date.now();
       const resp = await fetch(url, {
         method: "POST",
@@ -310,12 +456,21 @@ export async function textToSpeechPCM(
 
       if (!resp.ok) {
         const detail = await resp.text().catch(() => "");
+<<<<<<< HEAD
         console.log(
           `[tts] HTTP ${resp.status} for format=${format} (${fetchMs}ms): ${detail.slice(0, 200)}`,
         );
         // 如果 PCM 不支持（Azure 等），回退到 mp3
         if (format === "pcm" && (resp.status === 400 || resp.status === 422)) {
           console.log(`[tts] PCM format not supported, falling back to mp3`);
+=======
+        debugLog(
+          `[tts] HTTP ${resp.status} for format=${format} (${fetchMs}ms): ${detail.slice(0, 200)}`,
+        );
+        // Some providers reject PCM but accept MP3, so retry there.
+        if (format === "pcm" && (resp.status === 400 || resp.status === 422)) {
+          debugLog(`[tts] PCM format not supported, falling back to mp3`);
+>>>>>>> upstream/main
           lastError = new Error(`TTS PCM not supported: ${detail.slice(0, 200)}`);
           continue;
         }
@@ -324,37 +479,64 @@ export async function textToSpeechPCM(
 
       const arrayBuffer = await resp.arrayBuffer();
       const rawBuffer = Buffer.from(arrayBuffer);
+<<<<<<< HEAD
       console.log(
+=======
+      debugLog(
+>>>>>>> upstream/main
         `[tts] Response OK: format=${format}, size=${rawBuffer.length} bytes, latency=${fetchMs}ms`,
       );
 
       if (!needsDecode) {
+<<<<<<< HEAD
         console.log(
+=======
+        debugLog(
+>>>>>>> upstream/main
           `[tts] Done: PCM direct, ${rawBuffer.length} bytes, total=${Date.now() - startTime}ms`,
         );
         return { pcmBuffer: rawBuffer, sampleRate };
       }
 
+<<<<<<< HEAD
       // mp3 需要解码为 PCM
       console.log(`[tts] Decoding mp3 response (${rawBuffer.length} bytes) to PCM...`);
+=======
+      // MP3 responses must be decoded back into PCM.
+      debugLog(`[tts] Decoding mp3 response (${rawBuffer.length} bytes) to PCM...`);
+>>>>>>> upstream/main
       const tmpDir = path.join(fs.mkdtempSync(path.join(require("node:os").tmpdir(), "tts-")));
       const tmpMp3 = path.join(tmpDir, "tts.mp3");
       fs.writeFileSync(tmpMp3, rawBuffer);
 
       try {
+<<<<<<< HEAD
         // 优先用 ffmpeg
         const ffmpegCmd = await checkFfmpeg();
         if (ffmpegCmd) {
           const pcmBuf = await ffmpegToPCM(ffmpegCmd, tmpMp3, sampleRate);
           console.log(
+=======
+        // Prefer ffmpeg when it is available.
+        const ffmpegCmd = await checkFfmpeg();
+        if (ffmpegCmd) {
+          const pcmBuf = await ffmpegToPCM(ffmpegCmd, tmpMp3, sampleRate);
+          debugLog(
+>>>>>>> upstream/main
             `[tts] Done: mp3→PCM (ffmpeg), ${pcmBuf.length} bytes, total=${Date.now() - startTime}ms`,
           );
           return { pcmBuffer: pcmBuf, sampleRate };
         }
+<<<<<<< HEAD
         // WASM fallback
         const pcmBuf = await wasmDecodeMp3ToPCM(rawBuffer, sampleRate);
         if (pcmBuf) {
           console.log(
+=======
+        const pcmBuf = await wasmDecodeMp3ToPCM(rawBuffer, sampleRate);
+        if (pcmBuf) {
+          debugLog(
+>>>>>>> upstream/main
             `[tts] Done: mp3→PCM (wasm), ${pcmBuf.length} bytes, total=${Date.now() - startTime}ms`,
           );
           return { pcmBuffer: pcmBuf, sampleRate };
@@ -369,16 +551,25 @@ export async function textToSpeechPCM(
     } catch (err) {
       clearTimeout(ttsTimeout);
       lastError = err instanceof Error ? err : new Error(String(err));
+<<<<<<< HEAD
       console.log(`[tts] Error for format=${format}: ${lastError.message.slice(0, 200)}`);
       if (format === "pcm") {
         // PCM 失败时不立即抛出，尝试 mp3
+=======
+      debugLog(`[tts] Error for format=${format}: ${lastError.message.slice(0, 200)}`);
+      if (format === "pcm") {
+>>>>>>> upstream/main
         continue;
       }
       throw lastError;
     }
   }
 
+<<<<<<< HEAD
   console.log(`[tts] All formats exhausted after ${Date.now() - startTime}ms`);
+=======
+  debugLog(`[tts] All formats exhausted after ${Date.now() - startTime}ms`);
+>>>>>>> upstream/main
   throw lastError ?? new Error("TTS failed: all formats exhausted");
 }
 
@@ -409,6 +600,7 @@ export async function textToSilk(
   return { silkPath, silkBase64: silkBuffer.toString("base64"), duration };
 }
 
+<<<<<<< HEAD
 // ============ 核心：任意音频 → SILK Base64 ============
 
 /** QQ Bot API 原生支持上传的音频格式（无需转换为 SILK） */
@@ -426,6 +618,15 @@ const QQ_NATIVE_UPLOAD_FORMATS = [".wav", ".mp3", ".silk"];
  * 3. 无 ffmpeg → WASM fallback（仅支持 pcm, wav）
  *
  * @param directUploadFormats - 自定义直传格式列表，覆盖默认值。传 undefined 使用 QQ_NATIVE_UPLOAD_FORMATS
+=======
+// Generic audio -> SILK conversion.
+
+/** Upload formats accepted directly by the QQ Bot API. */
+const QQ_NATIVE_UPLOAD_FORMATS = [".wav", ".mp3", ".silk"];
+
+/**
+ * Convert a local audio file into an uploadable Base64 payload.
+>>>>>>> upstream/main
  */
 export async function audioFileToSilkBase64(
   filePath: string,
@@ -435,32 +636,55 @@ export async function audioFileToSilkBase64(
 
   const buf = fs.readFileSync(filePath);
   if (buf.length === 0) {
+<<<<<<< HEAD
     console.error(`[audio-convert] file is empty: ${filePath}`);
+=======
+    debugError(`[audio-convert] file is empty: ${filePath}`);
+>>>>>>> upstream/main
     return null;
   }
 
   const ext = path.extname(filePath).toLowerCase();
 
+<<<<<<< HEAD
   // 0. 直传判断：QQ Bot API 原生支持 WAV/MP3/SILK，可通过配置覆盖
+=======
+>>>>>>> upstream/main
   const uploadFormats = directUploadFormats
     ? normalizeFormats(directUploadFormats)
     : QQ_NATIVE_UPLOAD_FORMATS;
   if (uploadFormats.includes(ext)) {
+<<<<<<< HEAD
     console.log(`[audio-convert] direct upload (QQ native format): ${ext} (${buf.length} bytes)`);
     return buf.toString("base64");
   }
 
   // 1. .slk / .amr 扩展名 → 检测 SILK 魔数，是 SILK 则直传
+=======
+    debugLog(`[audio-convert] direct upload (QQ native format): ${ext} (${buf.length} bytes)`);
+    return buf.toString("base64");
+  }
+
+  // Some .slk/.slac files are already SILK and can be uploaded directly.
+>>>>>>> upstream/main
   if ([".slk", ".slac"].includes(ext)) {
     const stripped = stripAmrHeader(buf);
     const raw = new Uint8Array(stripped.buffer, stripped.byteOffset, stripped.byteLength);
     if (isSilk(raw)) {
+<<<<<<< HEAD
       console.log(`[audio-convert] SILK file, direct use: ${filePath} (${buf.length} bytes)`);
+=======
+      debugLog(`[audio-convert] SILK file, direct use: ${filePath} (${buf.length} bytes)`);
+>>>>>>> upstream/main
       return buf.toString("base64");
     }
   }
 
+<<<<<<< HEAD
   // 按文件头检测 SILK（不依赖扩展名）
+=======
+  // Also detect SILK by header, not just by extension.
+>>>>>>> upstream/main
   const rawCheck = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
   const strippedCheck = stripAmrHeader(buf);
   const strippedRaw = new Uint8Array(
@@ -469,21 +693,34 @@ export async function audioFileToSilkBase64(
     strippedCheck.byteLength,
   );
   if (isSilk(rawCheck) || isSilk(strippedRaw)) {
+<<<<<<< HEAD
     console.log(`[audio-convert] SILK detected by header: ${filePath} (${buf.length} bytes)`);
+=======
+    debugLog(`[audio-convert] SILK detected by header: ${filePath} (${buf.length} bytes)`);
+>>>>>>> upstream/main
     return buf.toString("base64");
   }
 
   const targetRate = 24000;
 
+<<<<<<< HEAD
   // 2. 优先使用 ffmpeg（业界标准做法，跨平台检测）
   const ffmpegCmd = await checkFfmpeg();
   if (ffmpegCmd) {
     try {
       console.log(
+=======
+  // Prefer ffmpeg for broad codec coverage.
+  const ffmpegCmd = await checkFfmpeg();
+  if (ffmpegCmd) {
+    try {
+      debugLog(
+>>>>>>> upstream/main
         `[audio-convert] ffmpeg (${ffmpegCmd}): converting ${ext} (${buf.length} bytes) → PCM s16le ${targetRate}Hz`,
       );
       const pcmBuf = await ffmpegToPCM(ffmpegCmd, filePath, targetRate);
       if (pcmBuf.length === 0) {
+<<<<<<< HEAD
         console.error(`[audio-convert] ffmpeg produced empty PCM output`);
         return null;
       }
@@ -502,13 +739,34 @@ export async function audioFileToSilkBase64(
   console.log(`[audio-convert] fallback: trying WASM decoders for ${ext}`);
 
   // 3a. PCM：视为 s16le 24000Hz 单声道
+=======
+        debugError(`[audio-convert] ffmpeg produced empty PCM output`);
+        return null;
+      }
+      const { silkBuffer } = await pcmToSilk(pcmBuf, targetRate);
+      debugLog(`[audio-convert] ffmpeg: ${ext} → SILK done (${silkBuffer.length} bytes)`);
+      return silkBuffer.toString("base64");
+    } catch (err) {
+      debugError(
+        `[audio-convert] ffmpeg conversion failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  // Fall back to WASM decoders when ffmpeg is unavailable.
+  debugLog(`[audio-convert] fallback: trying WASM decoders for ${ext}`);
+
+>>>>>>> upstream/main
   if (ext === ".pcm") {
     const pcmBuf = Buffer.from(buf.buffer, buf.byteOffset, buf.byteLength);
     const { silkBuffer } = await pcmToSilk(pcmBuf, targetRate);
     return silkBuffer.toString("base64");
   }
 
+<<<<<<< HEAD
   // 3b. WAV：手动解析（仅支持标准 PCM WAV）
+=======
+>>>>>>> upstream/main
   if (ext === ".wav" || (buf.length >= 4 && buf.toString("ascii", 0, 4) === "RIFF")) {
     const wavInfo = parseWavFallback(buf);
     if (wavInfo) {
@@ -517,26 +775,42 @@ export async function audioFileToSilkBase64(
     }
   }
 
+<<<<<<< HEAD
   // 3c. MP3：WASM 解码
+=======
+>>>>>>> upstream/main
   if (ext === ".mp3" || ext === ".mpeg") {
     const pcmBuf = await wasmDecodeMp3ToPCM(buf, targetRate);
     if (pcmBuf) {
       const { silkBuffer } = await pcmToSilk(pcmBuf, targetRate);
+<<<<<<< HEAD
       console.log(`[audio-convert] WASM: MP3 → SILK done (${silkBuffer.length} bytes)`);
+=======
+      debugLog(`[audio-convert] WASM: MP3 → SILK done (${silkBuffer.length} bytes)`);
+>>>>>>> upstream/main
       return silkBuffer.toString("base64");
     }
   }
 
   const installHint = isWindows()
+<<<<<<< HEAD
     ? "安装方式: choco install ffmpeg 或 scoop install ffmpeg 或从 https://ffmpeg.org 下载"
     : process.platform === "darwin"
       ? "安装方式: brew install ffmpeg"
       : "安装方式: sudo apt install ffmpeg 或 sudo yum install ffmpeg";
   console.error(`[audio-convert] unsupported format: ${ext} (no ffmpeg available). ${installHint}`);
+=======
+    ? "Install ffmpeg with choco install ffmpeg, scoop install ffmpeg, or from https://ffmpeg.org"
+    : process.platform === "darwin"
+      ? "Install ffmpeg with brew install ffmpeg"
+      : "Install ffmpeg with sudo apt install ffmpeg or sudo yum install ffmpeg";
+  debugError(`[audio-convert] unsupported format: ${ext} (no ffmpeg available). ${installHint}`);
+>>>>>>> upstream/main
   return null;
 }
 
 /**
+<<<<<<< HEAD
  * 等待文件就绪（轮询直到文件出现且大小稳定）
  * 用于 TTS 生成后等待文件写入完成
  *
@@ -548,21 +822,42 @@ export async function audioFileToSilkBase64(
 export async function waitForFile(
   filePath: string,
   timeoutMs: number = 120000,
+=======
+ * Wait until a file exists and its size has stabilized.
+ */
+export async function waitForFile(
+  filePath: string,
+  timeoutMs: number = 30000,
+>>>>>>> upstream/main
   pollMs: number = 500,
 ): Promise<number> {
   const start = Date.now();
   let lastSize = -1;
   let stableCount = 0;
   let fileExists = false;
+<<<<<<< HEAD
   let pollCount = 0;
 
+=======
+  let fileAppearedAt = 0;
+  let pollCount = 0;
+
+  const emptyGiveUpMs = 10000;
+  const noFileGiveUpMs = 15000;
+
+>>>>>>> upstream/main
   while (Date.now() - start < timeoutMs) {
     pollCount++;
     try {
       const stat = fs.statSync(filePath);
       if (!fileExists) {
         fileExists = true;
+<<<<<<< HEAD
         console.log(
+=======
+        fileAppearedAt = Date.now();
+        debugLog(
+>>>>>>> upstream/main
           `[audio-convert] waitForFile: file appeared (${stat.size} bytes, after ${Date.now() - start}ms): ${path.basename(filePath)}`,
         );
       }
@@ -570,7 +865,11 @@ export async function waitForFile(
         if (stat.size === lastSize) {
           stableCount++;
           if (stableCount >= 2) {
+<<<<<<< HEAD
             console.log(
+=======
+            debugLog(
+>>>>>>> upstream/main
               `[audio-convert] waitForFile: ready (${stat.size} bytes, waited ${Date.now() - start}ms, polls=${pollCount})`,
             );
             return stat.size;
@@ -579,43 +878,81 @@ export async function waitForFile(
           stableCount = 0;
         }
         lastSize = stat.size;
+<<<<<<< HEAD
       }
     } catch {
       // 文件可能还不存在，继续等
+=======
+      } else {
+        if (Date.now() - fileAppearedAt > emptyGiveUpMs) {
+          debugError(
+            `[audio-convert] waitForFile: file still empty after ${emptyGiveUpMs}ms, giving up: ${path.basename(filePath)}`,
+          );
+          return 0;
+        }
+      }
+    } catch {
+      if (!fileExists && Date.now() - start > noFileGiveUpMs) {
+        debugError(
+          `[audio-convert] waitForFile: file never appeared after ${noFileGiveUpMs}ms, giving up: ${path.basename(filePath)}`,
+        );
+        return 0;
+      }
+>>>>>>> upstream/main
     }
     await new Promise((r) => setTimeout(r, pollMs));
   }
 
+<<<<<<< HEAD
   // 超时后最后检查一次
   try {
     const finalStat = fs.statSync(filePath);
     if (finalStat.size > 0) {
       console.warn(
+=======
+  try {
+    const finalStat = fs.statSync(filePath);
+    if (finalStat.size > 0) {
+      debugWarn(
+>>>>>>> upstream/main
         `[audio-convert] waitForFile: timeout but file has data (${finalStat.size} bytes), using it`,
       );
       return finalStat.size;
     }
+<<<<<<< HEAD
     console.error(
       `[audio-convert] waitForFile: timeout after ${timeoutMs}ms, file exists but empty (0 bytes): ${path.basename(filePath)}`,
     );
   } catch {
     console.error(
+=======
+    debugError(
+      `[audio-convert] waitForFile: timeout after ${timeoutMs}ms, file exists but empty (0 bytes): ${path.basename(filePath)}`,
+    );
+  } catch {
+    debugError(
+>>>>>>> upstream/main
       `[audio-convert] waitForFile: timeout after ${timeoutMs}ms, file never appeared: ${path.basename(filePath)}`,
     );
   }
   return 0;
 }
 
+<<<<<<< HEAD
 // ============ ffmpeg 跨平台调用 ============
 
 /**
  * 检测 ffmpeg 是否可用（委托给 platform.ts 跨平台检测）
  * @returns ffmpeg 可执行路径或 null
  */
+=======
+/** Delegate ffmpeg detection to the platform helper. */
+>>>>>>> upstream/main
 async function checkFfmpeg(): Promise<string | null> {
   return detectFfmpeg();
 }
 
+<<<<<<< HEAD
 /**
  * 使用 ffmpeg 将任意音频文件转换为 PCM s16le 单声道 24kHz
  *
@@ -623,6 +960,9 @@ async function checkFfmpeg(): Promise<string | null> {
  * - Windows 上 pipe:1 需要 encoding: "buffer" 防止 BOM 问题
  * - 使用 detectFfmpeg() 返回的完整路径，兼容非 PATH 安装
  */
+=======
+/** Convert arbitrary audio into mono 24 kHz PCM s16le with ffmpeg. */
+>>>>>>> upstream/main
 function ffmpegToPCM(
   ffmpegCmd: string,
   inputPath: string,
@@ -650,7 +990,10 @@ function ffmpegToPCM(
       {
         maxBuffer: 50 * 1024 * 1024,
         encoding: "buffer",
+<<<<<<< HEAD
         // Windows: 隐藏弹出的 cmd 窗口
+=======
+>>>>>>> upstream/main
         ...(isWindows() ? { windowsHide: true } : {}),
       },
       (err, stdout) => {
@@ -664,6 +1007,7 @@ function ffmpegToPCM(
   });
 }
 
+<<<<<<< HEAD
 // ============ WASM fallback: MP3 解码 ============
 
 /**
@@ -674,6 +1018,13 @@ async function wasmDecodeMp3ToPCM(buf: Buffer, targetRate: number): Promise<Buff
   try {
     const { MPEGDecoder } = await import("mpg123-decoder");
     console.log(`[audio-convert] WASM MP3 decode: size=${buf.length} bytes`);
+=======
+/** Decode MP3 into PCM through mpg123-decoder when ffmpeg is unavailable. */
+async function wasmDecodeMp3ToPCM(buf: Buffer, targetRate: number): Promise<Buffer | null> {
+  try {
+    const { MPEGDecoder } = await import("mpg123-decoder");
+    debugLog(`[audio-convert] WASM MP3 decode: size=${buf.length} bytes`);
+>>>>>>> upstream/main
     const decoder = new MPEGDecoder();
     await decoder.ready;
 
@@ -681,17 +1032,29 @@ async function wasmDecodeMp3ToPCM(buf: Buffer, targetRate: number): Promise<Buff
     decoder.free();
 
     if (decoded.samplesDecoded === 0 || decoded.channelData.length === 0) {
+<<<<<<< HEAD
       console.error(
+=======
+      debugError(
+>>>>>>> upstream/main
         `[audio-convert] WASM MP3 decode: no samples (samplesDecoded=${decoded.samplesDecoded})`,
       );
       return null;
     }
 
+<<<<<<< HEAD
     console.log(
       `[audio-convert] WASM MP3 decode: samples=${decoded.samplesDecoded}, sampleRate=${decoded.sampleRate}, channels=${decoded.channelData.length}`,
     );
 
     // Float32 多声道混缩为单声道
+=======
+    debugLog(
+      `[audio-convert] WASM MP3 decode: samples=${decoded.samplesDecoded}, sampleRate=${decoded.sampleRate}, channels=${decoded.channelData.length}`,
+    );
+
+    // Down-mix multi-channel float PCM into mono.
+>>>>>>> upstream/main
     let floatMono: Float32Array;
     if (decoded.channelData.length === 1) {
       floatMono = decoded.channelData[0];
@@ -707,7 +1070,11 @@ async function wasmDecodeMp3ToPCM(buf: Buffer, targetRate: number): Promise<Buff
       }
     }
 
+<<<<<<< HEAD
     // Float32 → s16le
+=======
+    // Convert Float32 PCM into s16le.
+>>>>>>> upstream/main
     const s16 = new Uint8Array(floatMono.length * 2);
     const view = new DataView(s16.buffer);
     for (let i = 0; i < floatMono.length; i++) {
@@ -716,7 +1083,11 @@ async function wasmDecodeMp3ToPCM(buf: Buffer, targetRate: number): Promise<Buff
       view.setInt16(i * 2, Math.round(val), true);
     }
 
+<<<<<<< HEAD
     // 简单线性插值重采样
+=======
+    // Resample with simple linear interpolation.
+>>>>>>> upstream/main
     let pcm: Uint8Array = s16;
     if (decoded.sampleRate !== targetRate) {
       const inputSamples = s16.length / 2;
@@ -739,19 +1110,31 @@ async function wasmDecodeMp3ToPCM(buf: Buffer, targetRate: number): Promise<Buff
 
     return Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength);
   } catch (err) {
+<<<<<<< HEAD
     console.error(
       `[audio-convert] WASM MP3 decode failed: ${err instanceof Error ? err.message : String(err)}`,
     );
     if (err instanceof Error && err.stack) {
       console.error(`[audio-convert] stack: ${err.stack}`);
+=======
+    debugError(
+      `[audio-convert] WASM MP3 decode failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    if (err instanceof Error && err.stack) {
+      debugError(`[audio-convert] stack: ${err.stack}`);
+>>>>>>> upstream/main
     }
     return null;
   }
 }
 
+<<<<<<< HEAD
 /**
  * 规范化格式列表（确保以 . 开头，小写）
  */
+=======
+/** Normalize file extensions to lowercased dotted form. */
+>>>>>>> upstream/main
 function normalizeFormats(formats: string[]): string[] {
   return formats.map((f) => {
     const lower = f.toLowerCase().trim();
@@ -759,10 +1142,14 @@ function normalizeFormats(formats: string[]): string[] {
   });
 }
 
+<<<<<<< HEAD
 /**
  * WAV fallback 解析（无 ffmpeg 时使用）
  * 仅支持标准 PCM WAV (format=1, 16bit)
  */
+=======
+/** Parse standard PCM WAV as a no-ffmpeg fallback. */
+>>>>>>> upstream/main
 function parseWavFallback(buf: Buffer): Buffer | null {
   if (buf.length < 44) return null;
   if (buf.toString("ascii", 0, 4) !== "RIFF") return null;
@@ -777,7 +1164,11 @@ function parseWavFallback(buf: Buffer): Buffer | null {
   const bitsPerSample = buf.readUInt16LE(34);
   if (bitsPerSample !== 16) return null;
 
+<<<<<<< HEAD
   // 找 data chunk
+=======
+  // Find the PCM data chunk.
+>>>>>>> upstream/main
   let offset = 36;
   while (offset < buf.length - 8) {
     const chunkId = buf.toString("ascii", offset, offset + 4);
@@ -787,7 +1178,11 @@ function parseWavFallback(buf: Buffer): Buffer | null {
       const dataEnd = Math.min(dataStart + chunkSize, buf.length);
       let pcm = new Uint8Array(buf.buffer, buf.byteOffset + dataStart, dataEnd - dataStart);
 
+<<<<<<< HEAD
       // 多声道混缩
+=======
+      // Downmix multi-channel audio to mono.
+>>>>>>> upstream/main
       if (channels > 1) {
         const samplesPerCh = pcm.length / (2 * channels);
         const mono = new Uint8Array(samplesPerCh * 2);
@@ -801,7 +1196,11 @@ function parseWavFallback(buf: Buffer): Buffer | null {
         pcm = mono;
       }
 
+<<<<<<< HEAD
       // 简单线性插值重采样
+=======
+      // Resample with simple linear interpolation.
+>>>>>>> upstream/main
       const targetRate = 24000;
       if (sampleRate !== targetRate) {
         const inSamples = pcm.length / 2;

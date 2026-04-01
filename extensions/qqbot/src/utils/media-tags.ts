@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /**
  * 富媒体标签预处理与纠错
  *
@@ -12,6 +13,15 @@ const VALID_TAGS = ["qqimg", "qqvoice", "qqvideo", "qqfile"] as const;
 // 开头标签别名映射（key 全部小写）
 const TAG_ALIASES: Record<string, (typeof VALID_TAGS)[number]> = {
   // ---- qqimg 变体 ----
+=======
+import { expandTilde } from "./platform.js";
+
+// Canonical media tags. `qqmedia` is the generic auto-routing tag.
+const VALID_TAGS = ["qqimg", "qqvoice", "qqvideo", "qqfile", "qqmedia"] as const;
+
+// Lowercased aliases that should normalize to the canonical tag set.
+const TAG_ALIASES: Record<string, (typeof VALID_TAGS)[number]> = {
+>>>>>>> upstream/main
   qq_img: "qqimg",
   qqimage: "qqimg",
   qq_image: "qqimg",
@@ -26,31 +36,55 @@ const TAG_ALIASES: Record<string, (typeof VALID_TAGS)[number]> = {
   pic: "qqimg",
   picture: "qqimg",
   photo: "qqimg",
+<<<<<<< HEAD
   // ---- qqvoice 变体 ----
+=======
+>>>>>>> upstream/main
   qq_voice: "qqvoice",
   qqaudio: "qqvoice",
   qq_audio: "qqvoice",
   voice: "qqvoice",
   audio: "qqvoice",
+<<<<<<< HEAD
   // ---- qqvideo 变体 ----
   qq_video: "qqvideo",
   video: "qqvideo",
   // ---- qqfile 变体 ----
+=======
+  qq_video: "qqvideo",
+  video: "qqvideo",
+>>>>>>> upstream/main
   qq_file: "qqfile",
   qqdoc: "qqfile",
   qq_doc: "qqfile",
   file: "qqfile",
   doc: "qqfile",
   document: "qqfile",
+<<<<<<< HEAD
 };
 
 // 构建所有可识别的标签名列表（标准名 + 别名）
 const ALL_TAG_NAMES = [...VALID_TAGS, ...Object.keys(TAG_ALIASES)];
 // 按长度降序排列，优先匹配更长的名称（避免 "img" 抢先匹配 "qqimg" 的子串）
+=======
+  qq_media: "qqmedia",
+  media: "qqmedia",
+  attachment: "qqmedia",
+  attach: "qqmedia",
+  qqattachment: "qqmedia",
+  qq_attachment: "qqmedia",
+  qqsend: "qqmedia",
+  qq_send: "qqmedia",
+  send: "qqmedia",
+};
+
+const ALL_TAG_NAMES = [...VALID_TAGS, ...Object.keys(TAG_ALIASES)];
+>>>>>>> upstream/main
 ALL_TAG_NAMES.sort((a, b) => b.length - a.length);
 
 const TAG_NAME_PATTERN = ALL_TAG_NAMES.join("|");
 
+<<<<<<< HEAD
 /**
  * 构建一个宽容的正则，能匹配各种畸形标签写法：
  *
@@ -80,13 +114,49 @@ const FUZZY_MEDIA_TAG_REGEX = new RegExp(
     TAG_NAME_PATTERN +
     ")\\s*[>＞>]" +
     // 可选结尾反引号
+=======
+/** Match self-closing media-tag syntax with file/src/path/url attributes. */
+const SELF_CLOSING_TAG_REGEX = new RegExp(
+  "`?" +
+    "[<＜<]\\s*(" +
+    TAG_NAME_PATTERN +
+    ")" +
+    "(?:\\s+(?!file|src|path|url)[a-z_-]+\\s*=\\s*[\"']?[^\"'/>＞>]*?[\"']?)*" +
+    "\\s+(?:file|src|path|url)\\s*=\\s*" +
+    "[\"']?" +
+    "([^\"'/>＞>]+?)" +
+    "[\"']?" +
+    "(?:\\s+[a-z_-]+\\s*=\\s*[\"']?[^\"'/>＞>]*?[\"']?)*" +
+    "\\s*/?" +
+    "\\s*[>＞>]" +
+>>>>>>> upstream/main
     "`?",
   "gi",
 );
 
+<<<<<<< HEAD
 /**
  * 将标签名映射为标准名称
  */
+=======
+/** Match malformed wrapped media tags that should be normalized. */
+const FUZZY_MEDIA_TAG_REGEX = new RegExp(
+  "`?" +
+    "[<＜<]\\s*(" +
+    TAG_NAME_PATTERN +
+    ")\\s*[>＞>]" +
+    "[\"']?\\s*" +
+    "([^<＜<＞>\"'`]+?)" +
+    "\\s*[\"']?" +
+    "[<＜<]\\s*/?\\s*(?:" +
+    TAG_NAME_PATTERN +
+    ")\\s*[>＞>]" +
+    "`?",
+  "gi",
+);
+
+/** Normalize a raw tag name into the canonical tag set. */
+>>>>>>> upstream/main
 function resolveTagName(raw: string): (typeof VALID_TAGS)[number] {
   const lower = raw.toLowerCase();
   if ((VALID_TAGS as readonly string[]).includes(lower)) {
@@ -95,6 +165,7 @@ function resolveTagName(raw: string): (typeof VALID_TAGS)[number] {
   return TAG_ALIASES[lower] ?? "qqimg";
 }
 
+<<<<<<< HEAD
 /**
  * 预清理：将富媒体标签内部的换行/回车/制表符压缩为单个空格。
  *
@@ -105,6 +176,9 @@ function resolveTagName(raw: string): (typeof VALID_TAGS)[number] {
  * 此正则匹配从开标签到闭标签之间的内容（允许跨行），
  * 将内部所有 [\r\n\t] 替换为空格，然后压缩连续空格。
  */
+=======
+/** Match wrapped tags whose bodies need newline and tab cleanup. */
+>>>>>>> upstream/main
 const MULTILINE_TAG_CLEANUP = new RegExp(
   "([<＜<]\\s*(?:" +
     TAG_NAME_PATTERN +
@@ -116,6 +190,7 @@ const MULTILINE_TAG_CLEANUP = new RegExp(
   "gi",
 );
 
+<<<<<<< HEAD
 /**
  * 预处理 LLM 输出文本，将各种畸形/错误的富媒体标签修正为标准格式。
  *
@@ -127,6 +202,19 @@ const MULTILINE_TAG_CLEANUP = new RegExp(
 export function normalizeMediaTags(text: string): string {
   // 先将标签内部的换行/回车/制表符压缩为空格
   let cleaned = text.replace(
+=======
+/** Normalize malformed media-tag output into canonical wrapped tags. */
+export function normalizeMediaTags(text: string): string {
+  let cleaned = text.replace(SELF_CLOSING_TAG_REGEX, (_match, rawTag: string, content: string) => {
+    const tag = resolveTagName(rawTag);
+    const trimmed = content.trim();
+    if (!trimmed) return _match;
+    const expanded = expandTilde(trimmed);
+    return `<${tag}>${expanded}</${tag}>`;
+  });
+
+  cleaned = cleaned.replace(
+>>>>>>> upstream/main
     MULTILINE_TAG_CLEANUP,
     (_m, open: string, body: string, close: string) => {
       const flat = body.replace(/[\r\n\t]+/g, " ").replace(/ {2,}/g, " ");
@@ -137,8 +225,12 @@ export function normalizeMediaTags(text: string): string {
   return cleaned.replace(FUZZY_MEDIA_TAG_REGEX, (_match, rawTag: string, content: string) => {
     const tag = resolveTagName(rawTag);
     const trimmed = content.trim();
+<<<<<<< HEAD
     if (!trimmed) return _match; // 空内容不处理
     // 展开波浪线路径：~/Desktop/file.png → /Users/xxx/Desktop/file.png
+=======
+    if (!trimmed) return _match;
+>>>>>>> upstream/main
     const expanded = expandTilde(trimmed);
     return `<${tag}>${expanded}</${tag}>`;
   });

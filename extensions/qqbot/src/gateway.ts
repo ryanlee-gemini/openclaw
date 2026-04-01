@@ -1,11 +1,17 @@
+<<<<<<< HEAD
 import * as fs from "node:fs";
 import path from "node:path";
+=======
+import path from "node:path";
+import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
+>>>>>>> upstream/main
 import WebSocket from "ws";
 import {
   getAccessToken,
   getGatewayUrl,
   sendC2CMessage,
   sendChannelMessage,
+<<<<<<< HEAD
   sendGroupMessage,
   clearTokenCache,
   sendC2CImageMessage,
@@ -16,10 +22,16 @@ import {
   sendGroupVideoMessage,
   sendC2CFileMessage,
   sendGroupFileMessage,
+=======
+  sendDmMessage,
+  sendGroupMessage,
+  clearTokenCache,
+>>>>>>> upstream/main
   initApiConfig,
   startBackgroundTokenRefresh,
   stopBackgroundTokenRefresh,
   sendC2CInputNotify,
+<<<<<<< HEAD
 } from "./api.js";
 import {
   startImageServer,
@@ -30,6 +42,43 @@ import {
 import { recordKnownUser, flushKnownUsers } from "./known-users.js";
 import { getQQBotRuntime } from "./runtime.js";
 import { loadSession, saveSession, clearSession, type SessionState } from "./session-store.js";
+=======
+  onMessageSent,
+  PLUGIN_USER_AGENT,
+} from "./api.js";
+import { qqbotPlugin } from "./channel.js";
+import { processAttachments, formatVoiceText } from "./inbound-attachments.js";
+import { recordKnownUser, flushKnownUsers } from "./known-users.js";
+import { createMessageQueue, type QueuedMessage } from "./message-queue.js";
+import {
+  parseAndSendMediaTags,
+  sendPlainReply,
+  type DeliverEventContext,
+  type DeliverAccountContext,
+} from "./outbound-deliver.js";
+import { sendDocument, sendMedia as sendMediaAuto, type MediaTargetContext } from "./outbound.js";
+import {
+  setRefIndex,
+  getRefIndex,
+  formatRefEntryForAgent,
+  flushRefIndex,
+  type RefAttachmentSummary,
+} from "./ref-index-store.js";
+import {
+  sendWithTokenRetry,
+  sendErrorToTarget,
+  handleStructuredPayload,
+  type ReplyContext,
+  type MessageTarget,
+} from "./reply-dispatcher.js";
+import { getQQBotRuntime } from "./runtime.js";
+import { loadSession, saveSession, clearSession } from "./session-store.js";
+import {
+  matchSlashCommand,
+  type SlashCommandContext,
+  type SlashCommandFileResult,
+} from "./slash-commands.js";
+>>>>>>> upstream/main
 import type {
   ResolvedQQBotAccount,
   WSPayload,
@@ -37,6 +86,7 @@ import type {
   GuildMessageEvent,
   GroupMessageEvent,
 } from "./types.js";
+<<<<<<< HEAD
 import {
   convertSilkToWav,
   isVoiceAttachment,
@@ -344,11 +394,41 @@ function filterInternalMarkers(text: string): string {
 
   return result;
 }
+=======
+import { TypingKeepAlive, TYPING_INPUT_SECOND } from "./typing-keepalive.js";
+import { isGlobalTTSAvailable, resolveTTSConfig } from "./utils/audio-convert.js";
+import { runDiagnostics } from "./utils/platform.js";
+import { parseFaceTags, parseRefIndices, buildAttachmentSummaries } from "./utils/text-parsing.js";
+
+// QQ Bot intents grouped by permission level.
+const INTENTS = {
+  GUILDS: 1 << 0,
+  GUILD_MEMBERS: 1 << 1,
+  PUBLIC_GUILD_MESSAGES: 1 << 30,
+  DIRECT_MESSAGE: 1 << 12,
+  GROUP_AND_C2C: 1 << 25,
+};
+
+// Always request the full intent set for groups, DMs, and guild channels.
+const FULL_INTENTS = INTENTS.PUBLIC_GUILD_MESSAGES | INTENTS.DIRECT_MESSAGE | INTENTS.GROUP_AND_C2C;
+const FULL_INTENTS_DESC = "groups + DMs + channels";
+
+// Reconnect configuration.
+const RECONNECT_DELAYS = [1000, 2000, 5000, 10000, 30000, 60000];
+const RATE_LIMIT_DELAY = 60000;
+const MAX_RECONNECT_ATTEMPTS = 100;
+const MAX_QUICK_DISCONNECT_COUNT = 3;
+const QUICK_DISCONNECT_THRESHOLD = 5000;
+>>>>>>> upstream/main
 
 export interface GatewayContext {
   account: ResolvedQQBotAccount;
   abortSignal: AbortSignal;
+<<<<<<< HEAD
   cfg: unknown;
+=======
+  cfg: OpenClawConfig;
+>>>>>>> upstream/main
   onReady?: (data: unknown) => void;
   onError?: (error: Error) => void;
   log?: {
@@ -359,6 +439,7 @@ export interface GatewayContext {
 }
 
 /**
+<<<<<<< HEAD
  * 消息队列项类型（用于异步处理消息，防止阻塞心跳）
  */
 interface QueuedMessage {
@@ -412,6 +493,9 @@ async function ensureImageServer(
 /**
  * 启动 Gateway WebSocket 连接（带自动重连）
  * 支持流式消息发送
+=======
+ * Start the Gateway WebSocket connection with automatic reconnect support.
+>>>>>>> upstream/main
  */
 export async function startGateway(ctx: GatewayContext): Promise<void> {
   const { account, abortSignal, cfg, onReady, onError, log } = ctx;
@@ -420,7 +504,11 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
     throw new Error("QQBot not configured (missing appId or clientSecret)");
   }
 
+<<<<<<< HEAD
   // 启动环境诊断（首次连接时执行）
+=======
+  // Run environment diagnostics during startup.
+>>>>>>> upstream/main
   const diag = await runDiagnostics();
   if (diag.warnings.length > 0) {
     for (const w of diag.warnings) {
@@ -428,15 +516,62 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
     }
   }
 
+<<<<<<< HEAD
   // 初始化 API 配置（markdown 支持）
   initApiConfig({
+=======
+  // Initialize API behavior such as markdown support.
+  initApiConfig(account.appId, {
+>>>>>>> upstream/main
     markdownSupport: account.markdownSupport,
   });
   log?.info(
     `[qqbot:${account.accountId}] API config: markdownSupport=${account.markdownSupport === true}`,
   );
 
+<<<<<<< HEAD
   // TTS 配置验证
+=======
+  // Cache outbound refIdx values from QQ delivery responses for future quoting.
+  onMessageSent(account.appId, (refIdx, meta) => {
+    log?.info(
+      `[qqbot:${account.accountId}] onMessageSent called: refIdx=${refIdx}, mediaType=${meta.mediaType}, ttsText=${meta.ttsText?.slice(0, 30)}`,
+    );
+    const attachments: RefAttachmentSummary[] = [];
+    if (meta.mediaType) {
+      const localPath = meta.mediaLocalPath;
+      const filename = localPath ? path.basename(localPath) : undefined;
+      const attachment: RefAttachmentSummary = {
+        type: meta.mediaType,
+        ...(localPath ? { localPath } : {}),
+        ...(filename ? { filename } : {}),
+        ...(meta.mediaUrl ? { url: meta.mediaUrl } : {}),
+      };
+      // Preserve the original TTS text for voice messages so later quoting can use it.
+      if (meta.mediaType === "voice" && meta.ttsText) {
+        attachment.transcript = meta.ttsText;
+        attachment.transcriptSource = "tts";
+        log?.info(
+          `[qqbot:${account.accountId}] Saving voice transcript (TTS): ${meta.ttsText.slice(0, 50)}`,
+        );
+      }
+      attachments.push(attachment);
+    }
+    setRefIndex(refIdx, {
+      content: meta.text ?? "",
+      senderId: account.accountId,
+      senderName: account.accountId,
+      timestamp: Date.now(),
+      isBot: true,
+      ...(attachments.length > 0 ? { attachments } : {}),
+    });
+    log?.info(
+      `[qqbot:${account.accountId}] Cached outbound refIdx: ${refIdx}, attachments=${JSON.stringify(attachments)}`,
+    );
+  });
+
+  // Log TTS configuration state for diagnostics.
+>>>>>>> upstream/main
   const ttsCfg = resolveTTSConfig(cfg as Record<string, unknown>);
   if (ttsCfg) {
     const maskedKey =
@@ -444,17 +579,30 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
         ? `${ttsCfg.apiKey.slice(0, 4)}****${ttsCfg.apiKey.slice(-4)}`
         : "****";
     log?.info(
+<<<<<<< HEAD
       `[qqbot:${account.accountId}] TTS configured: model=${ttsCfg.model}, voice=${ttsCfg.voice}, authStyle=${ttsCfg.authStyle ?? "bearer"}, baseUrl=${ttsCfg.baseUrl}`,
+=======
+      `[qqbot:${account.accountId}] TTS configured (plugin): model=${ttsCfg.model}, voice=${ttsCfg.voice}, authStyle=${ttsCfg.authStyle ?? "bearer"}, baseUrl=${ttsCfg.baseUrl}`,
+>>>>>>> upstream/main
     );
     log?.info(
       `[qqbot:${account.accountId}] TTS apiKey: ${maskedKey}${ttsCfg.queryParams ? `, queryParams=${JSON.stringify(ttsCfg.queryParams)}` : ""}${ttsCfg.speed !== undefined ? `, speed=${ttsCfg.speed}` : ""}`,
     );
+<<<<<<< HEAD
+=======
+  } else if (isGlobalTTSAvailable(cfg as OpenClawConfig)) {
+    const globalProvider = (cfg as OpenClawConfig).messages?.tts?.provider ?? "auto";
+    log?.info(
+      `[qqbot:${account.accountId}] TTS configured (global fallback): provider=${globalProvider}`,
+    );
+>>>>>>> upstream/main
   } else {
     log?.info(
       `[qqbot:${account.accountId}] TTS not configured (voice messages will be unavailable)`,
     );
   }
 
+<<<<<<< HEAD
   // 如果配置了公网 URL，启动图床服务器
   let imageServerBaseUrl: string | null = null;
   if (account.imageServerBaseUrl) {
@@ -468,12 +616,15 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
     );
   }
 
+=======
+>>>>>>> upstream/main
   let reconnectAttempts = 0;
   let isAborted = false;
   let currentWs: WebSocket | null = null;
   let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   let sessionId: string | null = null;
   let lastSeq: number | null = null;
+<<<<<<< HEAD
   let lastConnectTime: number = 0; // 上次连接成功的时间
   let quickDisconnectCount = 0; // 连续快速断开次数
   let isConnecting = false; // 防止并发连接
@@ -484,10 +635,20 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
 
   // ============ P1-2: 尝试从持久化存储恢复 Session ============
   // 传入当前 appId，如果 appId 已变更（换了机器人），旧 session 自动失效
+=======
+  let lastConnectTime = 0;
+  let quickDisconnectCount = 0;
+  let isConnecting = false;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let shouldRefreshToken = false;
+
+  // Restore a persisted session when it still matches the current appId.
+>>>>>>> upstream/main
   const savedSession = loadSession(account.accountId, account.appId);
   if (savedSession) {
     sessionId = savedSession.sessionId;
     lastSeq = savedSession.lastSeq;
+<<<<<<< HEAD
     intentLevelIndex = savedSession.intentLevelIndex;
     lastSuccessfulIntentLevel = savedSession.intentLevelIndex;
     log?.info(
@@ -593,6 +754,143 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
     log?.info(
       `[qqbot:${account.accountId}] Message processor started (per-user concurrency, max ${MAX_CONCURRENT_USERS} users)`,
     );
+=======
+    log?.info(
+      `[qqbot:${account.accountId}] Restored session from storage: sessionId=${sessionId}, lastSeq=${lastSeq}`,
+    );
+  }
+
+  // Queue messages per peer while still allowing cross-peer concurrency.
+  const msgQueue = createMessageQueue({
+    accountId: account.accountId,
+    log,
+    isAborted: () => isAborted,
+  });
+
+  // Intercept plugin-level slash commands before queueing normal traffic.
+  const URGENT_COMMANDS = ["/stop"];
+
+  const trySlashCommandOrEnqueue = async (msg: QueuedMessage): Promise<void> => {
+    const content = (msg.content ?? "").trim();
+    if (!content.startsWith("/")) {
+      msgQueue.enqueue(msg);
+      return;
+    }
+
+    const contentLower = content.toLowerCase();
+    const isUrgentCommand = URGENT_COMMANDS.some(
+      (cmd) =>
+        contentLower === cmd.toLowerCase() || contentLower.startsWith(cmd.toLowerCase() + " "),
+    );
+    if (isUrgentCommand) {
+      log?.info(
+        `[qqbot:${account.accountId}] Urgent command detected: ${content.slice(0, 20)}, executing immediately`,
+      );
+      const peerId = msgQueue.getMessagePeerId(msg);
+      const droppedCount = msgQueue.clearUserQueue(peerId);
+      if (droppedCount > 0) {
+        log?.info(
+          `[qqbot:${account.accountId}] Dropped ${droppedCount} queued messages for ${peerId} due to urgent command`,
+        );
+      }
+      msgQueue.executeImmediate(msg);
+      return;
+    }
+
+    const receivedAt = Date.now();
+    const peerId = msgQueue.getMessagePeerId(msg);
+
+    // commandAuthorized is not meaningful for pre-dispatch commands: requireAuth:true
+    // commands are in frameworkCommands (not in the local registry) and are never
+    // matched by matchSlashCommand, so the auth gate inside it never fires here.
+    const cmdCtx: SlashCommandContext = {
+      type: msg.type,
+      senderId: msg.senderId,
+      senderName: msg.senderName,
+      messageId: msg.messageId,
+      eventTimestamp: msg.timestamp,
+      receivedAt,
+      rawContent: content,
+      args: "",
+      channelId: msg.channelId,
+      groupOpenid: msg.groupOpenid,
+      accountId: account.accountId,
+      appId: account.appId,
+      accountConfig: account.config,
+      commandAuthorized: true,
+      queueSnapshot: msgQueue.getSnapshot(peerId),
+    };
+
+    try {
+      const reply = await matchSlashCommand(cmdCtx);
+      if (reply === null) {
+        // Not a plugin-level command. Let the normal framework path handle it.
+        msgQueue.enqueue(msg);
+        return;
+      }
+
+      log?.info(
+        `[qqbot:${account.accountId}] Slash command matched: ${content}, replying directly`,
+      );
+      const token = await getAccessToken(account.appId, account.clientSecret);
+
+      // Handle either a plain-text reply or a reply with an attached file.
+      // Note: all current pre-dispatch commands return plain strings; the file
+      // path below is retained for forward-compatibility if a future requireAuth:false
+      // command returns a SlashCommandFileResult.
+      const isFileResult = typeof reply === "object" && reply !== null && "filePath" in reply;
+      const replyText = isFileResult ? (reply as SlashCommandFileResult).text : (reply as string);
+      const replyFile = isFileResult ? (reply as SlashCommandFileResult).filePath : null;
+
+      // Send the text portion first.
+      if (msg.type === "c2c") {
+        await sendC2CMessage(account.appId, token, msg.senderId, replyText, msg.messageId);
+      } else if (msg.type === "group" && msg.groupOpenid) {
+        await sendGroupMessage(account.appId, token, msg.groupOpenid, replyText, msg.messageId);
+      } else if (msg.channelId) {
+        await sendChannelMessage(token, msg.channelId, replyText, msg.messageId);
+      } else if (msg.type === "dm" && msg.guildId) {
+        await sendDmMessage(token, msg.guildId, replyText, msg.messageId);
+      }
+
+      // Send the file attachment if the command produced one.
+      if (replyFile) {
+        try {
+          const targetType =
+            msg.type === "group"
+              ? "group"
+              : msg.type === "dm"
+                ? "dm"
+                : msg.type === "c2c"
+                  ? "c2c"
+                  : "channel";
+          const targetId =
+            msg.type === "group"
+              ? msg.groupOpenid || msg.senderId
+              : msg.type === "dm"
+                ? msg.guildId || msg.senderId
+                : msg.type === "c2c"
+                  ? msg.senderId
+                  : msg.channelId || msg.senderId;
+          const mediaCtx: MediaTargetContext = {
+            targetType,
+            targetId,
+            account,
+            replyToId: msg.messageId,
+            logPrefix: `[qqbot:${account.accountId}]`,
+          };
+          await sendDocument(mediaCtx, replyFile);
+          log?.info(`[qqbot:${account.accountId}] Slash command file sent: ${replyFile}`);
+        } catch (fileErr) {
+          log?.error(`[qqbot:${account.accountId}] Failed to send slash command file: ${fileErr}`);
+        }
+      }
+    } catch (err) {
+      log?.error(`[qqbot:${account.accountId}] Slash command error: ${err}`);
+      // Fall back to the normal queue path if the slash command handler fails.
+      msgQueue.enqueue(msg);
+    }
+>>>>>>> upstream/main
   };
 
   abortSignal.addEventListener("abort", () => {
@@ -602,10 +900,16 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
       reconnectTimer = null;
     }
     cleanup();
+<<<<<<< HEAD
     // P1-1: 停止后台 Token 刷新
     stopBackgroundTokenRefresh();
     // P1-3: 保存已知用户数据
     flushKnownUsers();
+=======
+    stopBackgroundTokenRefresh(account.appId);
+    flushKnownUsers();
+    flushRefIndex();
+>>>>>>> upstream/main
   });
 
   const cleanup = () => {
@@ -633,7 +937,11 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
       return;
     }
 
+<<<<<<< HEAD
     // 取消已有的重连定时器
+=======
+    // Replace any pending reconnect timer with the new one.
+>>>>>>> upstream/main
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
@@ -654,7 +962,11 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
   };
 
   const connect = async () => {
+<<<<<<< HEAD
     // 防止并发连接
+=======
+    // Do not allow overlapping connection attempts.
+>>>>>>> upstream/main
     if (isConnecting) {
       log?.debug?.(`[qqbot:${account.accountId}] Already connecting, skip`);
       return;
@@ -664,10 +976,17 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
     try {
       cleanup();
 
+<<<<<<< HEAD
       // 如果标记了需要刷新 token，则清除缓存
       if (shouldRefreshToken) {
         log?.info(`[qqbot:${account.accountId}] Refreshing token...`);
         clearTokenCache();
+=======
+      // Clear the cached token before reconnecting when forced refresh was requested.
+      if (shouldRefreshToken) {
+        log?.info(`[qqbot:${account.accountId}] Refreshing token...`);
+        clearTokenCache(account.appId);
+>>>>>>> upstream/main
         shouldRefreshToken = false;
       }
 
@@ -677,12 +996,20 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
 
       log?.info(`[qqbot:${account.accountId}] Connecting to ${gatewayUrl}`);
 
+<<<<<<< HEAD
       const ws = new WebSocket(gatewayUrl);
+=======
+      const ws = new WebSocket(gatewayUrl, { headers: { "User-Agent": PLUGIN_USER_AGENT } });
+>>>>>>> upstream/main
       currentWs = ws;
 
       const pluginRuntime = getQQBotRuntime();
 
+<<<<<<< HEAD
       // 处理收到的消息
+=======
+      // Handle one inbound gateway message after it has left the queue.
+>>>>>>> upstream/main
       const handleMessage = async (event: {
         type: "c2c" | "guild" | "dm" | "group";
         senderId: string;
@@ -698,7 +1025,14 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
           url: string;
           filename?: string;
           voice_wav_url?: string;
+<<<<<<< HEAD
         }>;
+=======
+          asr_refer_text?: string;
+        }>;
+        refMsgIdx?: string;
+        msgIdx?: string;
+>>>>>>> upstream/main
       }) => {
         log?.debug?.(`[qqbot:${account.accountId}] Received message: ${JSON.stringify(event)}`);
         log?.info(
@@ -714,6 +1048,7 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
           direction: "inbound",
         });
 
+<<<<<<< HEAD
         // 发送输入状态提示（非关键，失败不影响主流程）
         try {
           let token = await getAccessToken(account.appId, account.clientSecret);
@@ -739,6 +1074,71 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
         // peerId 只放纯 ID，类型信息由 peer.kind 表达
         // 群聊：用 groupOpenid（框架根据 kind:"group" 区分）
         // 私聊：用 senderId（框架根据 dmScope 决定隔离粒度）
+=======
+        // Send typing state and keep it alive for C2C conversations only.
+        const isC2C = event.type === "c2c" || event.type === "dm";
+        // Keep the mutable handle in an object so TypeScript does not over-narrow it.
+        const typing: { keepAlive: TypingKeepAlive | null } = { keepAlive: null };
+
+        const inputNotifyPromise: Promise<string | undefined> = (async () => {
+          if (!isC2C) return undefined;
+          try {
+            let token = await getAccessToken(account.appId, account.clientSecret);
+            try {
+              const notifyResponse = await sendC2CInputNotify(
+                token,
+                event.senderId,
+                event.messageId,
+                TYPING_INPUT_SECOND,
+              );
+              log?.info(
+                `[qqbot:${account.accountId}] Sent input notify to ${event.senderId}${notifyResponse.refIdx ? `, got refIdx=${notifyResponse.refIdx}` : ""}`,
+              );
+              typing.keepAlive = new TypingKeepAlive(
+                () => getAccessToken(account.appId, account.clientSecret),
+                () => clearTokenCache(account.appId),
+                event.senderId,
+                event.messageId,
+                log,
+                `[qqbot:${account.accountId}]`,
+              );
+              typing.keepAlive.start();
+              return notifyResponse.refIdx;
+            } catch (notifyErr) {
+              const errMsg = String(notifyErr);
+              if (errMsg.includes("token") || errMsg.includes("401") || errMsg.includes("11244")) {
+                log?.info(`[qqbot:${account.accountId}] InputNotify token expired, refreshing...`);
+                clearTokenCache(account.appId);
+                token = await getAccessToken(account.appId, account.clientSecret);
+                const notifyResponse = await sendC2CInputNotify(
+                  token,
+                  event.senderId,
+                  event.messageId,
+                  TYPING_INPUT_SECOND,
+                );
+                typing.keepAlive = new TypingKeepAlive(
+                  () => getAccessToken(account.appId, account.clientSecret),
+                  () => clearTokenCache(account.appId),
+                  event.senderId,
+                  event.messageId,
+                  log,
+                  `[qqbot:${account.accountId}]`,
+                );
+                typing.keepAlive.start();
+                return notifyResponse.refIdx;
+              } else {
+                throw notifyErr;
+              }
+            }
+          } catch (err) {
+            log?.error(`[qqbot:${account.accountId}] sendC2CInputNotify error: ${err}`);
+            return undefined;
+          }
+        })();
+
+        const isGroupChat = event.type === "guild" || event.type === "group";
+        // Keep `peer.id` as the raw peer identifier and let `peer.kind` carry the routing type.
+>>>>>>> upstream/main
         const peerId =
           event.type === "guild"
             ? (event.channelId ?? "unknown")
@@ -758,6 +1158,7 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
 
         const envelopeOptions = pluginRuntime.channel.reply.resolveEnvelopeFormatOptions(cfg);
 
+<<<<<<< HEAD
         // 组装消息体
         // 静态系统提示已移至 skills/qqbot-cron/SKILL.md 和 skills/qqbot-media/SKILL.md
         // BodyForAgent 只保留必要的动态上下文信息
@@ -765,11 +1166,15 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
         // ============ 用户标识信息 ============
 
         // 收集额外的系统提示（如果配置了账户级别的 systemPrompt）
+=======
+        // Static prompting lives in the QQ Bot skills. This body only carries dynamic context.
+>>>>>>> upstream/main
         const systemPrompts: string[] = [];
         if (account.systemPrompt) {
           systemPrompts.push(account.systemPrompt);
         }
 
+<<<<<<< HEAD
         // 处理附件（图片等）- 下载到本地供 clawdbot 访问
         let attachmentInfo = "";
         const imageUrls: string[] = [];
@@ -902,12 +1307,92 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
         }
 
         // 解析 QQ 表情标签，将 <faceType=...,ext="base64"> 替换为 【表情: 中文名】
+=======
+        const processed = await processAttachments(event.attachments, {
+          accountId: account.accountId,
+          cfg,
+          log,
+        });
+        const {
+          attachmentInfo,
+          imageUrls,
+          imageMediaTypes,
+          voiceAttachmentPaths,
+          voiceAttachmentUrls,
+          voiceAsrReferTexts,
+          voiceTranscripts,
+          voiceTranscriptSources,
+          attachmentLocalPaths,
+        } = processed;
+
+        const voiceText = formatVoiceText(voiceTranscripts);
+        const hasAsrReferFallback = voiceTranscriptSources.includes("asr");
+
+>>>>>>> upstream/main
         const parsedContent = parseFaceTags(event.content);
         const userContent = voiceText
           ? (parsedContent.trim() ? `${parsedContent}\n${voiceText}` : voiceText) + attachmentInfo
           : parsedContent + attachmentInfo;
 
+<<<<<<< HEAD
         // Body: 展示用的用户原文（Web UI 看到的）
+=======
+        let replyToId: string | undefined;
+        let replyToBody: string | undefined;
+        let replyToSender: string | undefined;
+        let replyToIsQuote = false;
+
+        if (event.refMsgIdx) {
+          const refEntry = getRefIndex(event.refMsgIdx);
+          if (refEntry) {
+            replyToId = event.refMsgIdx;
+            replyToBody = formatRefEntryForAgent(refEntry);
+            replyToSender = refEntry.senderName ?? refEntry.senderId;
+            replyToIsQuote = true;
+            log?.info(
+              `[qqbot:${account.accountId}] Quote detected: refMsgIdx=${event.refMsgIdx}, sender=${replyToSender}, content="${replyToBody.slice(0, 80)}..."`,
+            );
+          } else {
+            log?.info(
+              `[qqbot:${account.accountId}] Quote detected but refMsgIdx not in cache: ${event.refMsgIdx}`,
+            );
+            replyToId = event.refMsgIdx;
+            replyToIsQuote = true;
+          }
+        }
+
+        // Prefer the push-event msgIdx, falling back to the InputNotify refIdx.
+        const inputNotifyRefIdx = await inputNotifyPromise;
+        const currentMsgIdx = event.msgIdx ?? inputNotifyRefIdx;
+        if (currentMsgIdx) {
+          const attSummaries = buildAttachmentSummaries(event.attachments, attachmentLocalPaths);
+          // Attach voice transcript metadata to the matching attachment summaries.
+          if (attSummaries && voiceTranscripts.length > 0) {
+            let voiceIdx = 0;
+            for (const att of attSummaries) {
+              if (att.type === "voice" && voiceIdx < voiceTranscripts.length) {
+                att.transcript = voiceTranscripts[voiceIdx];
+                if (voiceIdx < voiceTranscriptSources.length) {
+                  att.transcriptSource = voiceTranscriptSources[voiceIdx];
+                }
+                voiceIdx++;
+              }
+            }
+          }
+          setRefIndex(currentMsgIdx, {
+            content: parsedContent,
+            senderId: event.senderId,
+            senderName: event.senderName,
+            timestamp: new Date(event.timestamp).getTime(),
+            attachments: attSummaries,
+          });
+          log?.info(
+            `[qqbot:${account.accountId}] Cached msgIdx=${currentMsgIdx} for future reference (source: ${event.msgIdx ? "message_scene.ext" : "InputNotify"})`,
+          );
+        }
+
+        // Body is the user-visible raw message shown in the Web UI.
+>>>>>>> upstream/main
         const body = pluginRuntime.channel.reply.formatInboundEnvelope({
           channel: "qqbot",
           from: event.senderName ?? event.senderId,
@@ -922,6 +1407,7 @@ export async function startGateway(ctx: GatewayContext): Promise<void> {
           ...(imageUrls.length > 0 ? { imageUrls } : {}),
         });
 
+<<<<<<< HEAD
         // BodyForAgent: AI 实际看到的完整上下文（动态数据 + 系统提示 + 用户输入）
         const nowMs = Date.now();
 
@@ -996,6 +1482,73 @@ ${ttsHint}${sttHint}`;
           : systemPrompts.length > 0
             ? `${contextInfo}\n\n${systemPrompts.join("\n")}\n\n${userContent}`
             : `${contextInfo}\n\n${userContent}`;
+=======
+        // BodyForAgent is the full model-visible context.
+        const uniqueVoicePaths = [...new Set(voiceAttachmentPaths)];
+        const uniqueVoiceUrls = [...new Set(voiceAttachmentUrls)];
+        const uniqueVoiceAsrReferTexts = [...new Set(voiceAsrReferTexts)].filter(Boolean);
+        const sttTranscriptCount = voiceTranscriptSources.filter((s) => s === "stt").length;
+        const asrFallbackCount = voiceTranscriptSources.filter((s) => s === "asr").length;
+        const fallbackCount = voiceTranscriptSources.filter((s) => s === "fallback").length;
+        if (
+          voiceAttachmentPaths.length > 0 ||
+          voiceAttachmentUrls.length > 0 ||
+          uniqueVoiceAsrReferTexts.length > 0
+        ) {
+          const asrPreview =
+            uniqueVoiceAsrReferTexts.length > 0 ? uniqueVoiceAsrReferTexts[0].slice(0, 50) : "";
+          log?.info(
+            `[qqbot:${account.accountId}] Voice input summary: local=${uniqueVoicePaths.length}, remote=${uniqueVoiceUrls.length}, ` +
+              `asrReferTexts=${uniqueVoiceAsrReferTexts.length}, transcripts=${voiceTranscripts.length}, ` +
+              `source(stt/asr/fallback)=${sttTranscriptCount}/${asrFallbackCount}/${fallbackCount}` +
+              (asrPreview
+                ? `, asr_preview="${asrPreview}${uniqueVoiceAsrReferTexts[0].length > 50 ? "..." : ""}"`
+                : ""),
+          );
+        }
+        const qualifiedTarget = isGroupChat
+          ? event.type === "guild"
+            ? `qqbot:channel:${event.channelId}`
+            : `qqbot:group:${event.groupOpenid}`
+          : event.type === "dm"
+            ? `qqbot:dm:${event.guildId}`
+            : `qqbot:c2c:${event.senderId}`;
+
+        const hasTTS =
+          !!resolveTTSConfig(cfg as Record<string, unknown>) ||
+          isGlobalTTSAvailable(cfg as OpenClawConfig);
+
+        let quotePart = "";
+        if (replyToIsQuote) {
+          if (replyToBody) {
+            quotePart = `[Quoted message begins]\n${replyToBody}\n[Quoted message ends]\n`;
+          } else {
+            quotePart = `[Quoted message begins]\nOriginal content unavailable\n[Quoted message ends]\n`;
+          }
+        }
+
+        const staticParts: string[] = [`[QQBot] to=${qualifiedTarget}`];
+        if (hasTTS) staticParts.push("voice synthesis enabled");
+        const staticInstruction = staticParts.join(" | ");
+        systemPrompts.unshift(staticInstruction);
+
+        const dynLines: string[] = [];
+        if (imageUrls.length > 0) {
+          dynLines.push(`- Images: ${imageUrls.join(", ")}`);
+        }
+        if (uniqueVoicePaths.length > 0 || uniqueVoiceUrls.length > 0) {
+          dynLines.push(`- Voice: ${[...uniqueVoicePaths, ...uniqueVoiceUrls].join(", ")}`);
+        }
+        if (uniqueVoiceAsrReferTexts.length > 0) {
+          dynLines.push(`- ASR: ${uniqueVoiceAsrReferTexts.join(" | ")}`);
+        }
+        const dynamicCtx = dynLines.length > 0 ? dynLines.join("\n") + "\n" : "";
+
+        const userMessage = `${quotePart}${userContent}`;
+        const agentBody = userContent.startsWith("/")
+          ? userContent
+          : `${systemPrompts.join("\n")}\n\n${dynamicCtx}${userMessage}`;
+>>>>>>> upstream/main
 
         log?.info(`[qqbot:${account.accountId}] agentBody length: ${agentBody.length}`);
 
@@ -1007,6 +1560,7 @@ ${ttsHint}${sttHint}`;
               : `qqbot:c2c:${event.senderId}`;
         const toAddress = fromAddress;
 
+<<<<<<< HEAD
         // 计算命令授权状态
         // allowFrom: ["*"] 表示允许所有人，否则检查 senderId 是否在 allowFrom 列表中
         const allowFromList = account.config?.allowFrom ?? [];
@@ -1019,6 +1573,22 @@ ${ttsHint}${sttHint}`;
           );
 
         // 分离 imageUrls 为本地路径和远程 URL，供 openclaw 原生媒体处理
+=======
+        const rawAllowFrom = account.config?.allowFrom ?? [];
+        const normalizedAllowFrom = qqbotPlugin.config?.formatAllowFrom
+          ? qqbotPlugin.config.formatAllowFrom({
+              cfg: cfg as OpenClawConfig,
+              accountId: account.accountId,
+              allowFrom: rawAllowFrom,
+            })
+          : rawAllowFrom.map((e: string) => e.replace(/^qqbot:/i, "").toUpperCase());
+        const normalizedSenderId = event.senderId.replace(/^qqbot:/i, "").toUpperCase();
+        const allowAll =
+          normalizedAllowFrom.length === 0 || normalizedAllowFrom.some((e) => e === "*");
+        const commandAuthorized = allowAll || normalizedAllowFrom.includes(normalizedSenderId);
+
+        // Split local media paths from remote URLs for framework-native media handling.
+>>>>>>> upstream/main
         const localMediaPaths: string[] = [];
         const localMediaTypes: string[] = [];
         const remoteMediaUrls: string[] = [];
@@ -1056,8 +1626,18 @@ ${ttsHint}${sttHint}`;
           QQChannelId: event.channelId,
           QQGuildId: event.guildId,
           QQGroupOpenid: event.groupOpenid,
+<<<<<<< HEAD
           CommandAuthorized: commandAuthorized,
           // 传递媒体路径和 URL，使 openclaw 原生媒体处理（视觉等）能正常工作
+=======
+          QQVoiceAsrReferAvailable: hasAsrReferFallback,
+          QQVoiceTranscriptSources: voiceTranscriptSources,
+          QQVoiceAttachmentPaths: uniqueVoicePaths,
+          QQVoiceAttachmentUrls: uniqueVoiceUrls,
+          QQVoiceAsrReferTexts: uniqueVoiceAsrReferTexts,
+          QQVoiceInputStrategy: "prefer_audio_stt_then_asr_fallback",
+          CommandAuthorized: commandAuthorized,
+>>>>>>> upstream/main
           ...(localMediaPaths.length > 0
             ? {
                 MediaPaths: localMediaPaths,
@@ -1072,6 +1652,7 @@ ${ttsHint}${sttHint}`;
                 MediaUrl: remoteMediaUrls[0],
               }
             : {}),
+<<<<<<< HEAD
         });
 
         // 发送消息的辅助函数，带 token 过期重试
@@ -1113,6 +1694,32 @@ ${ttsHint}${sttHint}`;
             log?.error(`[qqbot:${account.accountId}] Failed to send error message: ${sendErr}`);
           }
         };
+=======
+          ...(replyToId
+            ? {
+                ReplyToId: replyToId,
+                ReplyToBody: replyToBody,
+                ReplyToSender: replyToSender,
+                ReplyToIsQuote: replyToIsQuote,
+              }
+            : {}),
+        });
+
+        const replyTarget: MessageTarget = {
+          type: event.type,
+          senderId: event.senderId,
+          messageId: event.messageId,
+          channelId: event.channelId,
+          guildId: event.guildId,
+          groupOpenid: event.groupOpenid,
+        };
+        const replyCtx: ReplyContext = { target: replyTarget, account, cfg, log };
+
+        const sendWithRetry = <T>(sendFn: (token: string) => Promise<T>) =>
+          sendWithTokenRetry(account.appId, account.clientSecret, sendFn, log, account.accountId);
+
+        const sendErrorMessage = (errorText: string) => sendErrorToTarget(replyCtx, errorText);
+>>>>>>> upstream/main
 
         try {
           const messagesConfig = pluginRuntime.channel.reply.resolveEffectiveMessagesConfig(
@@ -1120,10 +1727,88 @@ ${ttsHint}${sttHint}`;
             route.agentId,
           );
 
+<<<<<<< HEAD
           // 追踪是否有响应
           let hasResponse = false;
           const responseTimeout = 120000; // 120秒超时（2分钟，与 TTS/文件生成超时对齐）
           let timeoutId: ReturnType<typeof setTimeout> | null = null;
+=======
+          let hasResponse = false;
+          let hasBlockResponse = false;
+          let toolDeliverCount = 0;
+          const toolTexts: string[] = [];
+          const toolMediaUrls: string[] = [];
+          let toolFallbackSent = false;
+          const responseTimeout = 120000;
+          const toolOnlyTimeout = 60000;
+          const maxToolRenewals = 3;
+          let toolRenewalCount = 0;
+          let timeoutId: ReturnType<typeof setTimeout> | null = null;
+          let toolOnlyTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+          const sendToolFallback = async (): Promise<void> => {
+            if (toolMediaUrls.length > 0) {
+              log?.info(
+                `[qqbot:${account.accountId}] Tool fallback: forwarding ${toolMediaUrls.length} media URL(s) from tool deliver(s)`,
+              );
+              const mediaTimeout = 45000; // Per-media timeout: 45s.
+              for (const mediaUrl of toolMediaUrls) {
+                const ac = new AbortController();
+                try {
+                  const result = await Promise.race([
+                    sendMediaAuto({
+                      to: qualifiedTarget,
+                      text: "",
+                      mediaUrl,
+                      accountId: account.accountId,
+                      replyToId: event.messageId,
+                      account,
+                    }).then((r) => {
+                      if (ac.signal.aborted) {
+                        log?.info(
+                          `[qqbot:${account.accountId}] Tool fallback sendMedia completed after timeout, suppressing late delivery`,
+                        );
+                        return {
+                          channel: "qqbot",
+                          error: "Media send completed after timeout (suppressed)",
+                        } as typeof r;
+                      }
+                      return r;
+                    }),
+                    new Promise<{ channel: string; error: string }>((resolve) =>
+                      setTimeout(() => {
+                        ac.abort();
+                        resolve({
+                          channel: "qqbot",
+                          error: `Tool fallback media send timeout (${mediaTimeout / 1000}s)`,
+                        });
+                      }, mediaTimeout),
+                    ),
+                  ]);
+                  if (result.error) {
+                    log?.error(
+                      `[qqbot:${account.accountId}] Tool fallback sendMedia error: ${result.error}`,
+                    );
+                  }
+                } catch (err) {
+                  log?.error(`[qqbot:${account.accountId}] Tool fallback sendMedia failed: ${err}`);
+                }
+              }
+              return;
+            }
+            if (toolTexts.length > 0) {
+              const text = toolTexts.slice(-3).join("\n---\n").slice(0, 2000);
+              log?.info(
+                `[qqbot:${account.accountId}] Tool fallback: forwarding tool text (${text.length} chars)`,
+              );
+              await sendErrorMessage(text);
+              return;
+            }
+            log?.info(
+              `[qqbot:${account.accountId}] Tool fallback: no media or text collected from ${toolDeliverCount} tool deliver(s), silently dropping`,
+            );
+          };
+>>>>>>> upstream/main
 
           const timeoutPromise = new Promise<void>((_, reject) => {
             timeoutId = setTimeout(() => {
@@ -1133,6 +1818,7 @@ ${ttsHint}${sttHint}`;
             }, responseTimeout);
           });
 
+<<<<<<< HEAD
           // ============ 消息发送目标 ============
           // 确定发送目标
           const targetTo =
@@ -1142,6 +1828,8 @@ ${ttsHint}${sttHint}`;
                 ? `group:${event.groupOpenid}`
                 : `channel:${event.channelId}`;
 
+=======
+>>>>>>> upstream/main
           const dispatchPromise =
             pluginRuntime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
               ctx: ctxPayload,
@@ -1153,15 +1841,19 @@ ${ttsHint}${sttHint}`;
                   info: { kind: string },
                 ) => {
                   hasResponse = true;
+<<<<<<< HEAD
                   if (timeoutId) {
                     clearTimeout(timeoutId);
                     timeoutId = null;
                   }
+=======
+>>>>>>> upstream/main
 
                   log?.info(
                     `[qqbot:${account.accountId}] deliver called, kind: ${info.kind}, payload keys: ${Object.keys(payload).join(", ")}`,
                   );
 
+<<<<<<< HEAD
                   // ============ 跳过工具调用的中间结果 ============
                   // kind: "tool" 是 AI 调用工具后框架返回的中间结果（如 TTS 生成的音频路径），
                   // 不应直接发送给用户。AI 会在后续的 "block" deliver 中用 <qqvoice> 等标签
@@ -1791,6 +2483,140 @@ ${ttsHint}${sttHint}`;
                     }
 
                     // 记录活动并返回
+=======
+                  if (info.kind === "tool") {
+                    toolDeliverCount++;
+                    const toolText = (payload.text ?? "").trim();
+                    if (toolText) {
+                      toolTexts.push(toolText);
+                    }
+                    if (payload.mediaUrls?.length) {
+                      toolMediaUrls.push(...payload.mediaUrls);
+                    }
+                    if (payload.mediaUrl && !toolMediaUrls.includes(payload.mediaUrl)) {
+                      toolMediaUrls.push(payload.mediaUrl);
+                    }
+                    log?.info(
+                      `[qqbot:${account.accountId}] Collected tool deliver #${toolDeliverCount}: text=${toolText.length} chars, media=${toolMediaUrls.length} URLs`,
+                    );
+
+                    if (hasBlockResponse && toolMediaUrls.length > 0) {
+                      log?.info(
+                        `[qqbot:${account.accountId}] Block already sent, immediately forwarding ${toolMediaUrls.length} tool media URL(s)`,
+                      );
+                      const urlsToSend = [...toolMediaUrls];
+                      toolMediaUrls.length = 0;
+                      for (const mediaUrl of urlsToSend) {
+                        try {
+                          const result = await sendMediaAuto({
+                            to: qualifiedTarget,
+                            text: "",
+                            mediaUrl,
+                            accountId: account.accountId,
+                            replyToId: event.messageId,
+                            account,
+                          });
+                          if (result.error) {
+                            log?.error(
+                              `[qqbot:${account.accountId}] Tool media immediate forward error: ${result.error}`,
+                            );
+                          } else {
+                            log?.info(
+                              `[qqbot:${account.accountId}] Forwarded tool media (post-block): ${mediaUrl.slice(0, 80)}...`,
+                            );
+                          }
+                        } catch (err) {
+                          log?.error(
+                            `[qqbot:${account.accountId}] Tool media immediate forward failed: ${err}`,
+                          );
+                        }
+                      }
+                      return;
+                    }
+
+                    if (toolFallbackSent) {
+                      return;
+                    }
+
+                    if (toolOnlyTimeoutId) {
+                      if (toolRenewalCount < maxToolRenewals) {
+                        clearTimeout(toolOnlyTimeoutId);
+                        toolRenewalCount++;
+                        log?.info(
+                          `[qqbot:${account.accountId}] Tool-only timer renewed (${toolRenewalCount}/${maxToolRenewals})`,
+                        );
+                      } else {
+                        log?.info(
+                          `[qqbot:${account.accountId}] Tool-only timer renewal limit reached (${maxToolRenewals}), waiting for timeout`,
+                        );
+                        return;
+                      }
+                    }
+                    toolOnlyTimeoutId = setTimeout(async () => {
+                      if (!hasBlockResponse && !toolFallbackSent) {
+                        toolFallbackSent = true;
+                        log?.error(
+                          `[qqbot:${account.accountId}] Tool-only timeout: ${toolDeliverCount} tool deliver(s) but no block within ${toolOnlyTimeout / 1000}s, sending fallback`,
+                        );
+                        try {
+                          await sendToolFallback();
+                        } catch (sendErr) {
+                          log?.error(
+                            `[qqbot:${account.accountId}] Failed to send tool-only fallback: ${sendErr}`,
+                          );
+                        }
+                      }
+                    }, toolOnlyTimeout);
+                    return;
+                  }
+
+                  hasBlockResponse = true;
+                  typing.keepAlive?.stop();
+                  if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                  }
+                  if (toolOnlyTimeoutId) {
+                    clearTimeout(toolOnlyTimeoutId);
+                    toolOnlyTimeoutId = null;
+                  }
+                  if (toolDeliverCount > 0) {
+                    log?.info(
+                      `[qqbot:${account.accountId}] Block deliver after ${toolDeliverCount} tool deliver(s)`,
+                    );
+                  }
+
+                  const quoteRef = event.msgIdx;
+                  let quoteRefUsed = false;
+                  const consumeQuoteRef = (): string | undefined => {
+                    if (quoteRef && !quoteRefUsed) {
+                      quoteRefUsed = true;
+                      return quoteRef;
+                    }
+                    return undefined;
+                  };
+
+                  let replyText = payload.text ?? "";
+
+                  const deliverEvent: DeliverEventContext = {
+                    type: event.type,
+                    senderId: event.senderId,
+                    messageId: event.messageId,
+                    channelId: event.channelId,
+                    groupOpenid: event.groupOpenid,
+                    msgIdx: event.msgIdx,
+                  };
+                  const deliverActx: DeliverAccountContext = { account, qualifiedTarget, log };
+
+                  const mediaResult = await parseAndSendMediaTags(
+                    replyText,
+                    deliverEvent,
+                    deliverActx,
+                    sendWithRetry,
+                    consumeQuoteRef,
+                  );
+                  if (mediaResult.handled) {
+>>>>>>> upstream/main
                     pluginRuntime.channel.activity.record({
                       channel: "qqbot",
                       accountId: account.accountId,
@@ -1798,6 +2624,7 @@ ${ttsHint}${sttHint}`;
                     });
                     return;
                   }
+<<<<<<< HEAD
 
                   // ============ 结构化载荷检测与分发 ============
                   // 优先检测 QQBOT_PAYLOAD: 前缀，如果是结构化载荷则分发到对应处理器
@@ -2675,6 +3502,32 @@ ${ttsHint}${sttHint}`;
                       log?.error(`[qqbot:${account.accountId}] Send failed: ${err}`);
                     }
                   }
+=======
+                  replyText = mediaResult.normalizedText;
+
+                  const recordOutboundActivity = () =>
+                    pluginRuntime.channel.activity.record({
+                      channel: "qqbot",
+                      accountId: account.accountId,
+                      direction: "outbound",
+                    });
+                  const handled = await handleStructuredPayload(
+                    replyCtx,
+                    replyText,
+                    recordOutboundActivity,
+                  );
+                  if (handled) return;
+
+                  await sendPlainReply(
+                    payload,
+                    replyText,
+                    deliverEvent,
+                    deliverActx,
+                    sendWithRetry,
+                    consumeQuoteRef,
+                    toolMediaUrls,
+                  );
+>>>>>>> upstream/main
 
                   pluginRuntime.channel.activity.record({
                     channel: "qqbot",
@@ -2690,6 +3543,7 @@ ${ttsHint}${sttHint}`;
                     timeoutId = null;
                   }
 
+<<<<<<< HEAD
                   // 发送错误提示给用户，显示完整错误信息
                   const errMsg = String(err);
                   if (errMsg.includes("401") || errMsg.includes("key") || errMsg.includes("auth")) {
@@ -2697,15 +3551,29 @@ ${ttsHint}${sttHint}`;
                   } else {
                     // 显示完整错误信息，截取前 500 字符
                     await sendErrorMessage(`出错: ${errMsg.slice(0, 500)}`);
+=======
+                  const errMsg = String(err);
+                  if (errMsg.includes("401") || errMsg.includes("key") || errMsg.includes("auth")) {
+                    log?.error(`[qqbot:${account.accountId}] AI auth error: ${errMsg}`);
+                  } else {
+                    log?.error(`[qqbot:${account.accountId}] AI process error: ${errMsg}`);
+>>>>>>> upstream/main
                   }
                 },
               },
               replyOptions: {
+<<<<<<< HEAD
                 disableBlockStreaming: false,
               },
             });
 
           // 等待分发完成或超时
+=======
+                disableBlockStreaming: true,
+              },
+            });
+
+>>>>>>> upstream/main
           try {
             await Promise.race([dispatchPromise, timeoutPromise]);
           } catch (err) {
@@ -2714,25 +3582,52 @@ ${ttsHint}${sttHint}`;
             }
             if (!hasResponse) {
               log?.error(`[qqbot:${account.accountId}] No response within timeout`);
+<<<<<<< HEAD
               await sendErrorMessage(
                 "QQ已经收到了你的请求并转交给了Openclaw，任务可能比较复杂，正在处理中...",
               );
+=======
+            }
+          } finally {
+            if (toolOnlyTimeoutId) {
+              clearTimeout(toolOnlyTimeoutId);
+              toolOnlyTimeoutId = null;
+            }
+            if (toolDeliverCount > 0 && !hasBlockResponse && !toolFallbackSent) {
+              toolFallbackSent = true;
+              log?.error(
+                `[qqbot:${account.accountId}] Dispatch completed with ${toolDeliverCount} tool deliver(s) but no block deliver, sending fallback`,
+              );
+              await sendToolFallback();
+>>>>>>> upstream/main
             }
           }
         } catch (err) {
           log?.error(`[qqbot:${account.accountId}] Message processing failed: ${err}`);
+<<<<<<< HEAD
           await sendErrorMessage(`处理失败: ${String(err).slice(0, 500)}`);
+=======
+        } finally {
+          typing.keepAlive?.stop();
+>>>>>>> upstream/main
         }
       };
 
       ws.on("open", () => {
         log?.info(`[qqbot:${account.accountId}] WebSocket connected`);
+<<<<<<< HEAD
         isConnecting = false; // 连接完成，释放锁
         reconnectAttempts = 0; // 连接成功，重置重试计数
         lastConnectTime = Date.now(); // 记录连接时间
         // 启动消息处理器（异步处理，防止阻塞心跳）
         startMessageProcessor(handleMessage);
         // P1-1: 启动后台 Token 刷新
+=======
+        isConnecting = false;
+        reconnectAttempts = 0;
+        lastConnectTime = Date.now();
+        msgQueue.startProcessor(handleMessage);
+>>>>>>> upstream/main
         startBackgroundTokenRefresh(account.appId, account.clientSecret, {
           log: log as {
             info: (msg: string) => void;
@@ -2750,14 +3645,21 @@ ${ttsHint}${sttHint}`;
 
           if (s) {
             lastSeq = s;
+<<<<<<< HEAD
             // P1-2: 更新持久化存储中的 lastSeq（节流保存）
+=======
+>>>>>>> upstream/main
             if (sessionId) {
               saveSession({
                 sessionId,
                 lastSeq,
                 lastConnectedAt: lastConnectTime,
+<<<<<<< HEAD
                 intentLevelIndex:
                   lastSuccessfulIntentLevel >= 0 ? lastSuccessfulIntentLevel : intentLevelIndex,
+=======
+                intentLevelIndex: 0,
+>>>>>>> upstream/main
                 accountId: account.accountId,
                 savedAt: Date.now(),
                 appId: account.appId,
@@ -2771,7 +3673,10 @@ ${ttsHint}${sttHint}`;
             case 10: // Hello
               log?.info(`[qqbot:${account.accountId}] Hello received`);
 
+<<<<<<< HEAD
               // 如果有 session_id，尝试 Resume
+=======
+>>>>>>> upstream/main
               if (sessionId && lastSeq !== null) {
                 log?.info(`[qqbot:${account.accountId}] Attempting to resume session ${sessionId}`);
                 ws.send(
@@ -2785,6 +3690,7 @@ ${ttsHint}${sttHint}`;
                   }),
                 );
               } else {
+<<<<<<< HEAD
                 // 新连接，发送 Identify
                 // 如果有上次成功的级别，直接使用；否则从当前级别开始尝试
                 const levelToUse =
@@ -2792,20 +3698,31 @@ ${ttsHint}${sttHint}`;
                 const intentLevel = INTENT_LEVELS[Math.min(levelToUse, INTENT_LEVELS.length - 1)];
                 log?.info(
                   `[qqbot:${account.accountId}] Sending identify with intents: ${intentLevel.intents} (${intentLevel.description})`,
+=======
+                log?.info(
+                  `[qqbot:${account.accountId}] Sending identify with intents: ${FULL_INTENTS} (${FULL_INTENTS_DESC})`,
+>>>>>>> upstream/main
                 );
                 ws.send(
                   JSON.stringify({
                     op: 2,
                     d: {
                       token: `QQBot ${accessToken}`,
+<<<<<<< HEAD
                       intents: intentLevel.intents,
+=======
+                      intents: FULL_INTENTS,
+>>>>>>> upstream/main
                       shard: [0, 1],
                     },
                   }),
                 );
               }
 
+<<<<<<< HEAD
               // 启动心跳
+=======
+>>>>>>> upstream/main
               const interval = (d as { heartbeat_interval: number }).heartbeat_interval;
               if (heartbeatInterval) clearInterval(heartbeatInterval);
               heartbeatInterval = setInterval(() => {
@@ -2817,6 +3734,7 @@ ${ttsHint}${sttHint}`;
               break;
 
             case 0: // Dispatch
+<<<<<<< HEAD
               if (t === "READY") {
                 const readyData = d as { session_id: string };
                 sessionId = readyData.session_id;
@@ -2827,11 +3745,26 @@ ${ttsHint}${sttHint}`;
                   `[qqbot:${account.accountId}] Ready with ${successLevel.description}, session: ${sessionId}`,
                 );
                 // P1-2: 保存新的 Session 状态
+=======
+              log?.info(
+                `[qqbot:${account.accountId}] 📩 Dispatch event: t=${t}, d=${JSON.stringify(d)}`,
+              );
+              if (t === "READY") {
+                const readyData = d as { session_id: string };
+                sessionId = readyData.session_id;
+                log?.info(
+                  `[qqbot:${account.accountId}] Ready with ${FULL_INTENTS_DESC}, session: ${sessionId}`,
+                );
+>>>>>>> upstream/main
                 saveSession({
                   sessionId,
                   lastSeq,
                   lastConnectedAt: Date.now(),
+<<<<<<< HEAD
                   intentLevelIndex,
+=======
+                  intentLevelIndex: 0,
+>>>>>>> upstream/main
                   accountId: account.accountId,
                   savedAt: Date.now(),
                   appId: account.appId,
@@ -2839,14 +3772,22 @@ ${ttsHint}${sttHint}`;
                 onReady?.(d);
               } else if (t === "RESUMED") {
                 log?.info(`[qqbot:${account.accountId}] Session resumed`);
+<<<<<<< HEAD
                 // P1-2: 更新 Session 连接时间
+=======
+                onReady?.(d); // Notify the framework so health monitoring sees the connection as recovered.
+>>>>>>> upstream/main
                 if (sessionId) {
                   saveSession({
                     sessionId,
                     lastSeq,
                     lastConnectedAt: Date.now(),
+<<<<<<< HEAD
                     intentLevelIndex:
                       lastSuccessfulIntentLevel >= 0 ? lastSuccessfulIntentLevel : intentLevelIndex,
+=======
+                    intentLevelIndex: 0,
+>>>>>>> upstream/main
                     accountId: account.accountId,
                     savedAt: Date.now(),
                     appId: account.appId,
@@ -2854,20 +3795,29 @@ ${ttsHint}${sttHint}`;
                 }
               } else if (t === "C2C_MESSAGE_CREATE") {
                 const event = d as C2CMessageEvent;
+<<<<<<< HEAD
                 // P1-3: 记录已知用户
+=======
+>>>>>>> upstream/main
                 recordKnownUser({
                   openid: event.author.user_openid,
                   type: "c2c",
                   accountId: account.accountId,
                 });
+<<<<<<< HEAD
                 // 使用消息队列异步处理，防止阻塞心跳
                 enqueueMessage({
+=======
+                const c2cRefs = parseRefIndices(event.message_scene?.ext);
+                trySlashCommandOrEnqueue({
+>>>>>>> upstream/main
                   type: "c2c",
                   senderId: event.author.user_openid,
                   content: event.content,
                   messageId: event.id,
                   timestamp: event.timestamp,
                   attachments: event.attachments,
+<<<<<<< HEAD
                 });
               } else if (t === "AT_MESSAGE_CREATE") {
                 const event = d as GuildMessageEvent;
@@ -2879,6 +3829,16 @@ ${ttsHint}${sttHint}`;
                   accountId: account.accountId,
                 });
                 enqueueMessage({
+=======
+                  refMsgIdx: c2cRefs.refMsgIdx,
+                  msgIdx: c2cRefs.msgIdx,
+                });
+              } else if (t === "AT_MESSAGE_CREATE") {
+                const event = d as GuildMessageEvent;
+                // Guild users cannot receive proactive C2C messages — skip known-user recording.
+                const guildRefs = parseRefIndices((event as any).message_scene?.ext);
+                trySlashCommandOrEnqueue({
+>>>>>>> upstream/main
                   type: "guild",
                   senderId: event.author.id,
                   senderName: event.author.username,
@@ -2888,6 +3848,7 @@ ${ttsHint}${sttHint}`;
                   channelId: event.channel_id,
                   guildId: event.guild_id,
                   attachments: event.attachments,
+<<<<<<< HEAD
                 });
               } else if (t === "DIRECT_MESSAGE_CREATE") {
                 const event = d as GuildMessageEvent;
@@ -2899,6 +3860,16 @@ ${ttsHint}${sttHint}`;
                   accountId: account.accountId,
                 });
                 enqueueMessage({
+=======
+                  refMsgIdx: guildRefs.refMsgIdx,
+                  msgIdx: guildRefs.msgIdx,
+                });
+              } else if (t === "DIRECT_MESSAGE_CREATE") {
+                const event = d as GuildMessageEvent;
+                // DM author.id is a guild-scoped ID, not a C2C openid — skip known-user recording.
+                const dmRefs = parseRefIndices((event as any).message_scene?.ext);
+                trySlashCommandOrEnqueue({
+>>>>>>> upstream/main
                   type: "dm",
                   senderId: event.author.id,
                   senderName: event.author.username,
@@ -2907,17 +3878,30 @@ ${ttsHint}${sttHint}`;
                   timestamp: event.timestamp,
                   guildId: event.guild_id,
                   attachments: event.attachments,
+<<<<<<< HEAD
                 });
               } else if (t === "GROUP_AT_MESSAGE_CREATE") {
                 const event = d as GroupMessageEvent;
                 // P1-3: 记录已知用户（群组用户）
+=======
+                  refMsgIdx: dmRefs.refMsgIdx,
+                  msgIdx: dmRefs.msgIdx,
+                });
+              } else if (t === "GROUP_AT_MESSAGE_CREATE") {
+                const event = d as GroupMessageEvent;
+>>>>>>> upstream/main
                 recordKnownUser({
                   openid: event.author.member_openid,
                   type: "group",
                   groupOpenid: event.group_openid,
                   accountId: account.accountId,
                 });
+<<<<<<< HEAD
                 enqueueMessage({
+=======
+                const groupRefs = parseRefIndices(event.message_scene?.ext);
+                trySlashCommandOrEnqueue({
+>>>>>>> upstream/main
                   type: "group",
                   senderId: event.author.member_openid,
                   content: event.content,
@@ -2925,6 +3909,11 @@ ${ttsHint}${sttHint}`;
                   timestamp: event.timestamp,
                   groupOpenid: event.group_openid,
                   attachments: event.attachments,
+<<<<<<< HEAD
+=======
+                  refMsgIdx: groupRefs.refMsgIdx,
+                  msgIdx: groupRefs.msgIdx,
+>>>>>>> upstream/main
                 });
               }
               break;
@@ -2941,14 +3930,20 @@ ${ttsHint}${sttHint}`;
 
             case 9: // Invalid Session
               const canResume = d as boolean;
+<<<<<<< HEAD
               const currentLevel = INTENT_LEVELS[intentLevelIndex];
               log?.error(
                 `[qqbot:${account.accountId}] Invalid session (${currentLevel.description}), can resume: ${canResume}, raw: ${rawData}`,
+=======
+              log?.error(
+                `[qqbot:${account.accountId}] Invalid session (${FULL_INTENTS_DESC}), can resume: ${canResume}, raw: ${rawData}`,
+>>>>>>> upstream/main
               );
 
               if (!canResume) {
                 sessionId = null;
                 lastSeq = null;
+<<<<<<< HEAD
                 // P1-2: 清除持久化的 Session
                 clearSession(account.accountId);
 
@@ -2969,6 +3964,15 @@ ${ttsHint}${sttHint}`;
               }
               cleanup();
               // Invalid Session 后等待一段时间再重连
+=======
+                clearSession(account.accountId);
+                shouldRefreshToken = true;
+                log?.info(
+                  `[qqbot:${account.accountId}] Will refresh token and retry with full intents (${FULL_INTENTS_DESC})`,
+                );
+              }
+              cleanup();
+>>>>>>> upstream/main
               scheduleReconnect(3000);
               break;
           }
@@ -2979,6 +3983,7 @@ ${ttsHint}${sttHint}`;
 
       ws.on("close", (code, reason) => {
         log?.info(`[qqbot:${account.accountId}] WebSocket closed: ${code} ${reason.toString()}`);
+<<<<<<< HEAD
         isConnecting = false; // 释放锁
 
         // 根据错误码处理（参考 QQ 官方文档）
@@ -2990,16 +3995,26 @@ ${ttsHint}${sttHint}`;
         // 4900-4913: 内部错误，需要重新 identify
         // 4914: 机器人已下架
         // 4915: 机器人已封禁
+=======
+        isConnecting = false; // Release the connect lock.
+
+>>>>>>> upstream/main
         if (code === 4914 || code === 4915) {
           log?.error(
             `[qqbot:${account.accountId}] Bot is ${code === 4914 ? "offline/sandbox-only" : "banned"}. Please contact QQ platform.`,
           );
           cleanup();
+<<<<<<< HEAD
           // 不重连，直接退出
           return;
         }
 
         // 4004: Token 无效，强制刷新 token 后重连
+=======
+          return;
+        }
+
+>>>>>>> upstream/main
         if (code === 4004) {
           log?.info(
             `[qqbot:${account.accountId}] Invalid token (4004), will refresh token and reconnect`,
@@ -3012,7 +4027,10 @@ ${ttsHint}${sttHint}`;
           return;
         }
 
+<<<<<<< HEAD
         // 4008: 限流断开，等待后重连（不需要重新 identify）
+=======
+>>>>>>> upstream/main
         if (code === 4008) {
           log?.info(
             `[qqbot:${account.accountId}] Rate limited (4008), waiting ${RATE_LIMIT_DELAY}ms before reconnect`,
@@ -3024,7 +4042,10 @@ ${ttsHint}${sttHint}`;
           return;
         }
 
+<<<<<<< HEAD
         // 4006/4007/4009: 会话失效或超时，需要清除 session 重新 identify
+=======
+>>>>>>> upstream/main
         if (code === 4006 || code === 4007 || code === 4009) {
           const codeDesc: Record<number, string> = {
             4006: "session no longer valid",
@@ -3036,6 +4057,7 @@ ${ttsHint}${sttHint}`;
           );
           sessionId = null;
           lastSeq = null;
+<<<<<<< HEAD
           // 清除持久化的 Session
           clearSession(account.accountId);
           shouldRefreshToken = true;
@@ -3045,11 +4067,22 @@ ${ttsHint}${sttHint}`;
           sessionId = null;
           lastSeq = null;
           // 清除持久化的 Session
+=======
+          clearSession(account.accountId);
+          shouldRefreshToken = true;
+        } else if (code >= 4900 && code <= 4913) {
+          log?.info(`[qqbot:${account.accountId}] Internal error (${code}), will re-identify`);
+          sessionId = null;
+          lastSeq = null;
+>>>>>>> upstream/main
           clearSession(account.accountId);
           shouldRefreshToken = true;
         }
 
+<<<<<<< HEAD
         // 检测是否是快速断开（连接后很快就断了）
+=======
+>>>>>>> upstream/main
         const connectionDuration = Date.now() - lastConnectTime;
         if (connectionDuration < QUICK_DISCONNECT_THRESHOLD && lastConnectTime > 0) {
           quickDisconnectCount++;
@@ -3057,7 +4090,10 @@ ${ttsHint}${sttHint}`;
             `[qqbot:${account.accountId}] Quick disconnect detected (${connectionDuration}ms), count: ${quickDisconnectCount}`,
           );
 
+<<<<<<< HEAD
           // 如果连续快速断开超过阈值，等待更长时间
+=======
+>>>>>>> upstream/main
           if (quickDisconnectCount >= MAX_QUICK_DISCONNECT_COUNT) {
             log?.error(
               `[qqbot:${account.accountId}] Too many quick disconnects. This may indicate a permission issue.`,
@@ -3067,20 +4103,29 @@ ${ttsHint}${sttHint}`;
             );
             quickDisconnectCount = 0;
             cleanup();
+<<<<<<< HEAD
             // 快速断开太多次，等待更长时间再重连
+=======
+>>>>>>> upstream/main
             if (!isAborted && code !== 1000) {
               scheduleReconnect(RATE_LIMIT_DELAY);
             }
             return;
           }
         } else {
+<<<<<<< HEAD
           // 连接持续时间够长，重置计数
+=======
+>>>>>>> upstream/main
           quickDisconnectCount = 0;
         }
 
         cleanup();
 
+<<<<<<< HEAD
         // 非正常关闭则重连
+=======
+>>>>>>> upstream/main
         if (!isAborted && code !== 1000) {
           scheduleReconnect();
         }
@@ -3091,11 +4136,19 @@ ${ttsHint}${sttHint}`;
         onError?.(err);
       });
     } catch (err) {
+<<<<<<< HEAD
       isConnecting = false; // 释放锁
       const errMsg = String(err);
       log?.error(`[qqbot:${account.accountId}] Connection failed: ${err}`);
 
       // 如果是频率限制错误，等待更长时间
+=======
+      isConnecting = false;
+      const errMsg = String(err);
+      log?.error(`[qqbot:${account.accountId}] Connection failed: ${err}`);
+
+      // Back off more aggressively after rate-limit failures.
+>>>>>>> upstream/main
       if (errMsg.includes("Too many requests") || errMsg.includes("100001")) {
         log?.info(
           `[qqbot:${account.accountId}] Rate limited, waiting ${RATE_LIMIT_DELAY}ms before retry`,
@@ -3107,10 +4160,15 @@ ${ttsHint}${sttHint}`;
     }
   };
 
+<<<<<<< HEAD
   // 开始连接
   await connect();
 
   // 等待 abort 信号
+=======
+  await connect();
+
+>>>>>>> upstream/main
   return new Promise((resolve) => {
     abortSignal.addEventListener("abort", () => resolve());
   });

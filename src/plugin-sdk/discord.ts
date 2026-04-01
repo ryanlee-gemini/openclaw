@@ -5,16 +5,20 @@ export type {
 } from "../channels/plugins/types.js";
 export type { OpenClawConfig } from "../config/config.js";
 export type { DiscordAccountConfig, DiscordActionConfig } from "../config/types.js";
-export type { DiscordConfig } from "../config/types.discord.js";
-export type { DiscordPluralKitConfig } from "../../extensions/discord/api.js";
-export type { InspectedDiscordAccount } from "../../extensions/discord/api.js";
-export type { ResolvedDiscordAccount } from "../../extensions/discord/api.js";
-export type { DiscordSendComponents, DiscordSendEmbeds } from "../../extensions/discord/api.js";
+export type { DiscordConfig, DiscordPluralKitConfig } from "../config/types.discord.js";
+export type {
+  DiscordComponentMessageSpec,
+  DiscordSendComponents,
+  DiscordSendEmbeds,
+  DiscordSendResult,
+  InspectedDiscordAccount,
+  ResolvedDiscordAccount,
+} from "./discord-surface.js";
 export type {
   ThreadBindingManager,
   ThreadBindingRecord,
   ThreadBindingTargetKind,
-} from "../../extensions/discord/runtime-api.js";
+} from "./discord-thread-bindings.js";
 export type {
   ChannelConfiguredBindingProvider,
   ChannelConfiguredBindingConversationRef,
@@ -52,11 +56,11 @@ export {
 export {
   listDiscordDirectoryGroupsFromConfig,
   listDiscordDirectoryPeersFromConfig,
-} from "../../extensions/discord/src/directory-config.js";
+} from "./discord-surface.js";
 export {
   resolveDiscordGroupRequireMention,
   resolveDiscordGroupToolPolicy,
-} from "../../extensions/discord/src/group-policy.js";
+} from "./discord-surface.js";
 export { DiscordConfigSchema } from "../config/zod-schema.providers-core.js";
 
 export {
@@ -65,39 +69,54 @@ export {
 } from "./status-helpers.js";
 
 export {
+  buildDiscordComponentMessage,
   createDiscordActionGate,
+  handleDiscordMessageAction,
   listDiscordAccountIds,
+  resolveDiscordAccount,
   resolveDefaultDiscordAccountId,
-} from "../../extensions/discord/api.js";
-export { inspectDiscordAccount } from "../../extensions/discord/api.js";
+} from "./discord-surface.js";
+export { loadOutboundMediaFromUrl } from "./outbound-media.js";
+export { inspectDiscordAccount } from "./discord-surface.js";
 export {
   looksLikeDiscordTargetId,
   normalizeDiscordMessagingTarget,
   normalizeDiscordOutboundTarget,
-} from "../../extensions/discord/api.js";
-export { collectDiscordAuditChannelIds } from "../../extensions/discord/runtime-api.js";
-export { collectDiscordStatusIssues } from "../../extensions/discord/api.js";
+} from "./discord-surface.js";
+export { collectDiscordAuditChannelIds } from "./discord-runtime-surface.js";
+export { collectDiscordStatusIssues } from "./discord-surface.js";
 export {
   DISCORD_DEFAULT_INBOUND_WORKER_TIMEOUT_MS,
   DISCORD_DEFAULT_LISTENER_TIMEOUT_MS,
-} from "../../extensions/discord/runtime-api.js";
-export { normalizeExplicitDiscordSessionKey } from "../../extensions/discord/api.js";
+} from "./discord-timeouts.js";
+export { normalizeExplicitDiscordSessionKey } from "./discord-session-key.js";
 export {
   autoBindSpawnedDiscordSubagent,
+  getThreadBindingManager,
   listThreadBindingsBySessionKey,
+  resolveThreadBindingIdleTimeoutMs,
+  resolveThreadBindingInactivityExpiresAt,
+  resolveThreadBindingMaxAgeExpiresAt,
+  resolveThreadBindingMaxAgeMs,
+  setThreadBindingIdleTimeoutBySessionKey,
+  setThreadBindingMaxAgeBySessionKey,
   unbindThreadBindingsBySessionKey,
-} from "../../extensions/discord/runtime-api.js";
-export { getGateway } from "../../extensions/discord/runtime-api.js";
-export { getPresence } from "../../extensions/discord/runtime-api.js";
-export { readDiscordComponentSpec } from "../../extensions/discord/api.js";
-export { resolveDiscordChannelId } from "../../extensions/discord/api.js";
+} from "./discord-thread-bindings.js";
+export { createThreadBindingManager as createDiscordThreadBindingManager } from "./discord-thread-bindings.js";
+export { getGateway } from "./discord-runtime-surface.js";
+export { getPresence } from "./discord-runtime-surface.js";
+export { readDiscordComponentSpec } from "./discord-surface.js";
+export { resolveDiscordChannelId } from "./discord-surface.js";
 export {
   addRoleDiscord,
+  auditDiscordChannelPermissions,
   banMemberDiscord,
   createChannelDiscord,
   createScheduledEventDiscord,
   createThreadDiscord,
   deleteChannelDiscord,
+  editDiscordComponentMessage,
+  registerBuiltDiscordComponentMessage,
   deleteMessageDiscord,
   editChannelDiscord,
   editMessageDiscord,
@@ -110,23 +129,30 @@ export {
   fetchVoiceStatusDiscord,
   hasAnyGuildPermissionDiscord,
   kickMemberDiscord,
+  listDiscordDirectoryGroupsLive,
+  listDiscordDirectoryPeersLive,
   listGuildChannelsDiscord,
   listGuildEmojisDiscord,
   listPinsDiscord,
   listScheduledEventsDiscord,
   listThreadsDiscord,
+  monitorDiscordProvider,
   moveChannelDiscord,
   pinMessageDiscord,
+  probeDiscord,
   reactMessageDiscord,
   readMessagesDiscord,
   removeChannelPermissionDiscord,
   removeOwnReactionsDiscord,
   removeReactionDiscord,
   removeRoleDiscord,
+  resolveDiscordChannelAllowlist,
+  resolveDiscordUserAllowlist,
   searchMessagesDiscord,
   sendDiscordComponentMessage,
   sendMessageDiscord,
   sendPollDiscord,
+  sendTypingDiscord,
   sendStickerDiscord,
   sendVoiceMessageDiscord,
   setChannelPermissionDiscord,
@@ -134,5 +160,6 @@ export {
   unpinMessageDiscord,
   uploadEmojiDiscord,
   uploadStickerDiscord,
-} from "../../extensions/discord/runtime-api.js";
-export { discordMessageActions } from "../../extensions/discord/runtime-api.js";
+} from "./discord-runtime-surface.js";
+export { discordMessageActions } from "./discord-runtime-surface.js";
+export { resolveDiscordOutboundSessionRoute } from "./discord-runtime-surface.js";

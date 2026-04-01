@@ -3,8 +3,9 @@ import {
   buildChannelConfigSchema,
   DmPolicySchema,
   MarkdownConfigSchema,
-} from "openclaw/plugin-sdk/channel-config-schema";
-import { z } from "zod";
+} from "openclaw/plugin-sdk/channel-config-primitives";
+import { buildSecretInputSchema } from "openclaw/plugin-sdk/secret-input";
+import { z } from "openclaw/plugin-sdk/zod";
 
 /**
  * Validates https:// URLs only (no javascript:, data:, file:, etc.)
@@ -73,7 +74,7 @@ export const NostrConfigSchema = z.object({
   markdown: MarkdownConfigSchema,
 
   /** Private key in hex or nsec bech32 format */
-  privateKey: z.string().optional(),
+  privateKey: buildSecretInputSchema().optional(),
 
   /** WebSocket relay URLs to connect to */
   relays: z.array(z.string()).optional(),

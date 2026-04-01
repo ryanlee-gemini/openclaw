@@ -1,13 +1,26 @@
+<<<<<<< HEAD
 import type { ChannelPlugin, OpenClawConfig } from "openclaw/plugin-sdk";
+=======
+import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
+import type { ChannelPlugin } from "openclaw/plugin-sdk/core";
+>>>>>>> upstream/main
 import {
   applyAccountNameToChannelSection,
   deleteAccountFromConfigSection,
   setAccountEnabledInConfigSection,
 } from "openclaw/plugin-sdk/core";
+<<<<<<< HEAD
+=======
+import { hasConfiguredSecretInput } from "openclaw/plugin-sdk/secret-input";
+import { initApiConfig } from "./api.js";
+import { applyQQBotSetupAccountConfig, validateQQBotSetupInput } from "./channel.setup.js";
+import { qqbotChannelConfigSchema } from "./config-schema.js";
+>>>>>>> upstream/main
 import {
   DEFAULT_ACCOUNT_ID,
   listQQBotAccountIds,
   resolveQQBotAccount,
+<<<<<<< HEAD
   applyQQBotAccountConfig,
   resolveDefaultQQBotAccountId,
 } from "./config.js";
@@ -49,10 +62,32 @@ function chunkText(text: string, limit: number): string[] {
   }
 
   return chunks;
+=======
+  resolveDefaultQQBotAccountId,
+} from "./config.js";
+import { getQQBotRuntime } from "./runtime.js";
+import { qqbotSetupWizard } from "./setup-surface.js";
+// Re-export text helpers so existing consumers of channel.ts are unaffected.
+// The canonical definition lives in text-utils.ts to avoid a circular
+// dependency: channel.ts → (dynamic) gateway.ts → outbound-deliver.ts → channel.ts.
+export { chunkText, TEXT_CHUNK_LIMIT } from "./text-utils.js";
+import type { ResolvedQQBotAccount } from "./types.js";
+
+// Shared promise so concurrent multi-account startups serialize the dynamic
+// import of the gateway module, avoiding an ESM circular-dependency race.
+let _gatewayModulePromise: Promise<typeof import("./gateway.js")> | undefined;
+function loadGatewayModule(): Promise<typeof import("./gateway.js")> {
+  _gatewayModulePromise ??= import("./gateway.js");
+  return _gatewayModulePromise;
+>>>>>>> upstream/main
 }
 
 export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
   id: "qqbot",
+<<<<<<< HEAD
+=======
+  setupWizard: qqbotSetupWizard,
+>>>>>>> upstream/main
   meta: {
     id: "qqbot",
     label: "QQ Bot",
@@ -67,6 +102,7 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
     reactions: false,
     threads: false,
     /**
+<<<<<<< HEAD
      * blockStreaming: true 表示该 Channel 支持块流式
      * 框架会收集流式响应，然后通过 deliver 回调发送
      */
@@ -81,6 +117,21 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
     resolveAccount: (cfg, accountId) => resolveQQBotAccount(cfg, accountId),
     defaultAccountId: (cfg) => resolveDefaultQQBotAccountId(cfg),
     // 新增：设置账户启用状态
+=======
+     * blockStreaming=true means the channel supports block streaming.
+     * The framework collects streamed blocks and sends them through deliver().
+     */
+    blockStreaming: true,
+  },
+  reload: { configPrefixes: ["channels.qqbot"] },
+  configSchema: qqbotChannelConfigSchema,
+
+  config: {
+    listAccountIds: (cfg) => listQQBotAccountIds(cfg),
+    resolveAccount: (cfg, accountId) =>
+      resolveQQBotAccount(cfg, accountId, { allowUnresolvedSecretRef: true }),
+    defaultAccountId: (cfg) => resolveDefaultQQBotAccountId(cfg),
+>>>>>>> upstream/main
     setAccountEnabled: ({ cfg, accountId, enabled }) =>
       setAccountEnabledInConfigSection({
         cfg,
@@ -89,7 +140,10 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
         enabled,
         allowTopLevel: true,
       }),
+<<<<<<< HEAD
     // 新增：删除账户
+=======
+>>>>>>> upstream/main
     deleteAccount: ({ cfg, accountId }) =>
       deleteAccountFromConfigSection({
         cfg,
@@ -97,11 +151,22 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
         accountId,
         clearBaseFields: ["appId", "clientSecret", "clientSecretFile", "name"],
       }),
+<<<<<<< HEAD
     isConfigured: (account) => Boolean(account?.appId && account?.clientSecret),
+=======
+    isConfigured: (account) =>
+      Boolean(
+        account?.appId &&
+        (Boolean(account?.clientSecret) ||
+          hasConfiguredSecretInput(account?.config?.clientSecret) ||
+          Boolean(account?.config?.clientSecretFile?.trim())),
+      ),
+>>>>>>> upstream/main
     describeAccount: (account) => ({
       accountId: account?.accountId ?? DEFAULT_ACCOUNT_ID,
       name: account?.name,
       enabled: account?.enabled ?? false,
+<<<<<<< HEAD
       configured: Boolean(account?.appId && account?.clientSecret),
       tokenSource: account?.secretSource,
     }),
@@ -123,6 +188,31 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
     // 新增：规范化账户 ID
     resolveAccountId: ({ accountId }) => accountId?.trim().toLowerCase() || DEFAULT_ACCOUNT_ID,
     // 新增：应用账户名称
+=======
+      configured: Boolean(
+        account?.appId &&
+        (Boolean(account?.clientSecret) ||
+          hasConfiguredSecretInput(account?.config?.clientSecret) ||
+          Boolean(account?.config?.clientSecretFile?.trim())),
+      ),
+      tokenSource: account?.secretSource,
+    }),
+    resolveAllowFrom: ({ cfg, accountId }) => {
+      const account = resolveQQBotAccount(cfg, accountId, { allowUnresolvedSecretRef: true });
+      const allowFrom = account.config?.allowFrom;
+      return allowFrom;
+    },
+    // Normalize allowFrom entries by removing the qqbot: prefix and uppercasing IDs.
+    formatAllowFrom: ({ allowFrom }) =>
+      (allowFrom ?? [])
+        .map((entry) => String(entry).trim())
+        .filter(Boolean)
+        .map((entry) => entry.replace(/^qqbot:/i, ""))
+        .map((entry) => entry.toUpperCase()),
+  },
+  setup: {
+    resolveAccountId: ({ accountId }) => accountId?.trim().toLowerCase() || DEFAULT_ACCOUNT_ID,
+>>>>>>> upstream/main
     applyAccountName: ({ cfg, accountId, name }) =>
       applyAccountNameToChannelSection({
         cfg,
@@ -130,6 +220,7 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
         accountId,
         name,
       }),
+<<<<<<< HEAD
     validateInput: ({ input }) => {
       if (!input.token && !input.tokenFile && !input.useEnv) {
         return "QQBot requires --token (format: appId:clientSecret) or --use-env";
@@ -219,15 +310,57 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
           return true;
         }
         // UUID 格式的 openid（QQ Bot 的用户/群 ID 格式）
+=======
+    validateInput: ({ accountId, input }) => validateQQBotSetupInput({ accountId, input }),
+    applyAccountConfig: ({ cfg, accountId, input }) =>
+      applyQQBotSetupAccountConfig({ cfg, accountId, input }),
+  },
+  messaging: {
+    /** Normalize common QQ Bot target formats into the canonical qqbot:... form. */
+    normalizeTarget: (target: string): string | undefined => {
+      const id = target.replace(/^qqbot:/i, "");
+      if (id.startsWith("c2c:") || id.startsWith("group:") || id.startsWith("channel:")) {
+        return `qqbot:${id}`;
+      }
+      const openIdHexPattern = /^[0-9a-fA-F]{32}$/;
+      if (openIdHexPattern.test(id)) {
+        return `qqbot:c2c:${id}`;
+      }
+      const openIdUuidPattern =
+        /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+      if (openIdUuidPattern.test(id)) {
+        return `qqbot:c2c:${id}`;
+      }
+
+      return undefined;
+    },
+    targetResolver: {
+      /** Return true when the id looks like a QQ Bot target. */
+      looksLikeId: (id: string): boolean => {
+        if (/^qqbot:(c2c|group|channel):/i.test(id)) {
+          return true;
+        }
+        if (/^(c2c|group|channel):/i.test(id)) {
+          return true;
+        }
+        if (/^[0-9a-fA-F]{32}$/.test(id)) {
+          return true;
+        }
+>>>>>>> upstream/main
         const openIdPattern =
           /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
         return openIdPattern.test(id);
       },
+<<<<<<< HEAD
       hint: "QQ Bot 目标格式: qqbot:c2c:openid (私聊) 或 qqbot:group:groupid (群聊)",
+=======
+      hint: "QQ Bot target format: qqbot:c2c:openid (direct) or qqbot:group:groupid (group)",
+>>>>>>> upstream/main
     },
   },
   outbound: {
     deliveryMode: "direct",
+<<<<<<< HEAD
     chunker: chunkText,
     chunkerMode: "markdown",
     textChunkLimit: 2000,
@@ -238,10 +371,29 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
         channel: "qqbot",
         messageId: result.messageId,
         error: result.error ? new Error(result.error) : undefined,
+=======
+    chunker: (text, limit) => getQQBotRuntime().channel.text.chunkMarkdownText(text, limit),
+    chunkerMode: "markdown",
+    textChunkLimit: 5000,
+    sendText: async ({ to, text, accountId, replyToId, cfg }) => {
+      const account = resolveQQBotAccount(cfg, accountId);
+      const { sendText } = await import("./outbound.js");
+      initApiConfig(account.appId, { markdownSupport: account.markdownSupport });
+      const result = await sendText({ to, text, accountId, replyToId, account });
+      return {
+        channel: "qqbot" as const,
+        messageId: result.messageId ?? "",
+        meta: result.error ? { error: result.error } : undefined,
+>>>>>>> upstream/main
       };
     },
     sendMedia: async ({ to, text, mediaUrl, accountId, replyToId, cfg }) => {
       const account = resolveQQBotAccount(cfg, accountId);
+<<<<<<< HEAD
+=======
+      const { sendMedia } = await import("./outbound.js");
+      initApiConfig(account.appId, { markdownSupport: account.markdownSupport });
+>>>>>>> upstream/main
       const result = await sendMedia({
         to,
         text: text ?? "",
@@ -251,17 +403,36 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
         account,
       });
       return {
+<<<<<<< HEAD
         channel: "qqbot",
         messageId: result.messageId,
         error: result.error ? new Error(result.error) : undefined,
+=======
+        channel: "qqbot" as const,
+        messageId: result.messageId ?? "",
+        meta: result.error ? { error: result.error } : undefined,
+>>>>>>> upstream/main
       };
     },
   },
   gateway: {
     startAccount: async (ctx) => {
+<<<<<<< HEAD
       const { account, abortSignal, log, cfg } = ctx;
 
       log?.info(`[qqbot:${account.accountId}] Starting gateway`);
+=======
+      const { account } = ctx;
+      const { abortSignal, log, cfg } = ctx;
+      // Serialize the dynamic import so concurrent multi-account startups
+      // do not hit an ESM circular-dependency race where the gateway chunk's
+      // transitive imports have not finished evaluating yet.
+      const { startGateway } = await loadGatewayModule();
+
+      log?.info(
+        `[qqbot:${account.accountId}] Starting gateway — appId=${account.appId}, enabled=${account.enabled}, name=${account.name ?? "unnamed"}`,
+      );
+>>>>>>> upstream/main
 
       await startGateway({
         account,
@@ -286,7 +457,10 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
         },
       });
     },
+<<<<<<< HEAD
     // 新增：登出账户（清除配置中的凭证）
+=======
+>>>>>>> upstream/main
     logoutAccount: async ({ accountId, cfg }) => {
       const nextCfg = { ...cfg } as OpenClawConfig;
       const nextQQBot = cfg.channels?.qqbot ? { ...cfg.channels.qqbot } : undefined;
@@ -295,10 +469,24 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
 
       if (nextQQBot) {
         const qqbot = nextQQBot as Record<string, unknown>;
+<<<<<<< HEAD
         if (accountId === DEFAULT_ACCOUNT_ID && qqbot.clientSecret) {
           delete qqbot.clientSecret;
           cleared = true;
           changed = true;
+=======
+        if (accountId === DEFAULT_ACCOUNT_ID) {
+          if (qqbot.clientSecret) {
+            delete qqbot.clientSecret;
+            cleared = true;
+            changed = true;
+          }
+          if (qqbot.clientSecretFile) {
+            delete qqbot.clientSecretFile;
+            cleared = true;
+            changed = true;
+          }
+>>>>>>> upstream/main
         }
         const accounts = qqbot.accounts as Record<string, Record<string, unknown>> | undefined;
         if (accounts && accountId in accounts) {
@@ -308,6 +496,14 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
             cleared = true;
             changed = true;
           }
+<<<<<<< HEAD
+=======
+          if (entry && "clientSecretFile" in entry) {
+            delete entry.clientSecretFile;
+            cleared = true;
+            changed = true;
+          }
+>>>>>>> upstream/main
           if (entry && Object.keys(entry).length === 0) {
             delete accounts[accountId];
             changed = true;
@@ -341,8 +537,12 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
       lastInboundAt: null,
       lastOutboundAt: null,
     },
+<<<<<<< HEAD
     // 新增：构建通道摘要
     buildChannelSummary: ({ snapshot }: { snapshot: Record<string, unknown> }) => ({
+=======
+    buildChannelSummary: ({ snapshot }) => ({
+>>>>>>> upstream/main
       configured: snapshot.configured ?? false,
       tokenSource: snapshot.tokenSource ?? "none",
       running: snapshot.running ?? false,
@@ -350,6 +550,7 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
       lastConnectedAt: snapshot.lastConnectedAt ?? null,
       lastError: snapshot.lastError ?? null,
     }),
+<<<<<<< HEAD
     buildAccountSnapshot: ({
       account,
       runtime,
@@ -357,6 +558,9 @@ export const qqbotPlugin: ChannelPlugin<ResolvedQQBotAccount> = {
       account?: ResolvedQQBotAccount;
       runtime?: Record<string, unknown>;
     }) => ({
+=======
+    buildAccountSnapshot: ({ account, runtime }) => ({
+>>>>>>> upstream/main
       accountId: account?.accountId ?? DEFAULT_ACCOUNT_ID,
       name: account?.name,
       enabled: account?.enabled ?? false,
